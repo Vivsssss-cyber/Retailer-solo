@@ -29,17 +29,19 @@
 
 ```
 src/
-  app/                 # routes: / , /play/[attemptId]
+  app/                 # routes: / , /play/[attemptId], /api/retailer-challenge/*
   components/
     cyan/              # design system + PixelIcons
     game/              # play UI (KPIs, pipeline, charts, decision)
     report/            # final performance report
   engine/              # PRD formulas (source of truth for math)
-  services/            # API + mock
+  server/              # backend domain: store, service, leaderboard, errors
+  services/            # client API + mock
   store/               # Zustand
   styles/tokens.css    # --sv-* Cyan tokens
 docs/
   BACKEND_GUIDE.md     # backend expectations
+  BACKEND_STATUS.md    # what is implemented vs next
   API_CONTRACT.md      # endpoint sheet
   DESIGN_SOURCE.md     # design provenance
 ```
@@ -85,7 +87,8 @@ docs/
 ```bash
 npm install
 npm run dev      # http://localhost:3000
-npm test         # engine unit tests
+npm test         # engine + server unit tests
+npm run smoke:api  # HTTP acceptance vs running dev server (BASE_URL optional)
 npm run build
 npm run lint
 ```
@@ -114,10 +117,15 @@ Copy `.env.example` → `.env.local`:
 ## Current state (2026-08-02)
 
 - Standalone Next app with Cyan UI + PixelIcons + logos  
-- PRD engine + 8 unit tests (incl. full 12-round sim)  
-- Offline mock: heats, attempts, live/final/global boards, report  
+- PRD engine + unit tests (incl. full 12-round sim)  
+- Offline mock: heats, attempts, live/final/global boards, report (default)  
 - Playable loop: decide → **vehicle rail + round summary (one screen)** → report  
-- Backend not live (mock + contract only)
+- **Backend (B1–B4):** Next.js API under `/api/retailer-challenge/*` + `src/server/*`  
+  - Authoritative round settle via shared `src/engine`  
+  - File store `.data/retailer-challenge.json` (local/dev; not multi-instance)  
+  - Service tests in `src/server/__tests__/service.test.ts`  
+  - Status notes: `docs/BACKEND_STATUS.md`  
+  - Live mode: `NEXT_PUBLIC_USE_MOCK=false` (same-origin or `NEXT_PUBLIC_API_URL`)
 
 ### Known frontend gaps
 
@@ -125,6 +133,13 @@ Copy `.env.example` → `.env.local`:
 - Live board polling during play  
 - True single-screen no-scroll densify  
 - Official one-attempt UX  
+
+### Known backend gaps (B5–B6)
+
+- Strong identity / OTP for official one-attempt  
+- Rate limits  
+- Postgres (or other multi-instance) store  
+- Staging E2E mock-off sign-off  
 
 ### Added from solo-beergame prototype (2026-08-02)
 
@@ -146,6 +161,7 @@ Copy `.env.example` → `.env.local`:
 - `/admin` section (solo-beergame creator parity for game stats/numbers)  
 - Active config in `localStorage` (`retailer-challenge-admin-config-v1`); mock heats snapshot it  
 - PIN gate: `admin` (sessionStorage only — not production auth)  
+- Note: live API seeds `DEFAULT_CONFIG`; admin localStorage edits apply to mock only until server config upsert is wired  
 
 ---
 

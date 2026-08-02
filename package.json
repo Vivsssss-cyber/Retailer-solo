@@ -8,8 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke:api": "node scripts/smoke-api.mjs"
   },
+
   "dependencies": {
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",

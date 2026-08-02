@@ -40,6 +40,8 @@ export interface CompleteAttemptResponse {
   heat_rank: number | null;
   global_rank: number | null;
   live_heat_board: LeaderboardRow[];
+  /** Min final cost among completed attempts in the heat (gap-to-winner UI). */
+  heat_winner_cost?: number | null;
 }
 
 export interface RetailerChallengeApi {

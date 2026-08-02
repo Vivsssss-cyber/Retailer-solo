@@ -68,6 +68,9 @@ tmp/
 temp/
 *.local
 
+# Backend file store (local/dev persistence)
+.data/
+
 # Optional Playwright / e2e artifacts (if added later)
 test-results/
 playwright-report/

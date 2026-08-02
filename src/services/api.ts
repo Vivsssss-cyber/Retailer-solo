@@ -2,13 +2,24 @@ import type { RetailerChallengeApi } from "./types";
 import { mockAdapter } from "./mockAdapter";
 
 /**
- * Live REST client (wired when NEXT_PUBLIC_API_URL is set and mock is off).
- * For v1 demo, mockAdapter is default.
+ * Live REST client — used when NEXT_PUBLIC_USE_MOCK is "false".
+ * With empty NEXT_PUBLIC_API_URL, calls same-origin Next.js API routes.
  */
-const USE_MOCK =
-  process.env.NEXT_PUBLIC_USE_MOCK !== "false" || !process.env.NEXT_PUBLIC_API_URL;
+const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== "false";
 
 const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
+
+class ApiRequestError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.code = code;
+  }
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${base}/api/retailer-challenge${path}`, {
@@ -19,8 +30,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || res.statusText);
+    let message = res.statusText;
+    let code: string | undefined;
+    try {
+      const body = (await res.json()) as { error?: string; code?: string };
+      if (body.error) message = body.error;
+      code = body.code;
+    } catch {
+      try {
+        const text = await res.text();
+        if (text) message = text;
+      } catch {
+        /* ignore */
+      }
+    }
+    throw new ApiRequestError(message, res.status, code);
   }
   return res.json() as Promise<T>;
 }
@@ -30,23 +54,36 @@ const liveApi: RetailerChallengeApi = {
   createHeat: (body) =>
     request(`/heats`, { method: "POST", body: JSON.stringify(body) }),
   createAttempt: (heatId, body) =>
-    request(`/heats/${heatId}/attempts`, {
+    request(`/heats/${encodeURIComponent(heatId)}/attempts`, {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  getAttempt: (attemptId) => request(`/attempts/${attemptId}`),
+  getAttempt: async (attemptId) => {
+    try {
+      return await request(`/attempts/${encodeURIComponent(attemptId)}`);
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.status === 404) return null;
+      throw err;
+    }
+  },
   submitRound: (attemptId, body) =>
-    request(`/attempts/${attemptId}/rounds`, {
+    request(`/attempts/${encodeURIComponent(attemptId)}/rounds`, {
       method: "POST",
       body: JSON.stringify(body),
     }),
   completeAttempt: (attemptId) =>
-    request(`/attempts/${attemptId}/complete`, { method: "POST" }),
+    request(`/attempts/${encodeURIComponent(attemptId)}/complete`, {
+      method: "POST",
+    }),
   getHeatLeaderboard: (heatId, mode) =>
-    request(`/heats/${heatId}/leaderboard?mode=${mode}`),
+    request(
+      `/heats/${encodeURIComponent(heatId)}/leaderboard?mode=${mode}`,
+    ),
   getGlobalLeaderboard: (configurationId) =>
-    request(`/events/default/global-leaderboard?configuration_id=${configurationId}`),
+    request(
+      `/events/default/global-leaderboard?configuration_id=${encodeURIComponent(configurationId)}`,
+    ),
 };
 
 export const api: RetailerChallengeApi = USE_MOCK ? mockAdapter : liveApi;
-export { USE_MOCK };
+export { USE_MOCK, ApiRequestError };
