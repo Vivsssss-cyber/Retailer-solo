@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { FO, GameButton } from "@/components/cyan";
 import type { GameConfig } from "@/engine";
 import {
+  cloneDefaultConfig,
   exportConfigJson,
   importConfigJson,
   loadAdminConfig,
@@ -11,6 +12,8 @@ import {
   resetAdminConfig,
   saveAdminConfig,
 } from "@/lib/adminConfigStore";
+import { api, USE_MOCK } from "@/services/api";
+import { parseApiFailure } from "@/services/apiErrors";
 import {
   AdminSection,
   Field,
@@ -21,9 +24,35 @@ export function useAdminConfig() {
   const [config, setConfig] = useState<GameConfig | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [source, setSource] = useState<"local" | "server">("local");
 
   useEffect(() => {
-    setConfig(loadAdminConfig());
+    let cancelled = false;
+    void (async () => {
+      if (USE_MOCK) {
+        if (!cancelled) {
+          setConfig(loadAdminConfig());
+          setSource("local");
+        }
+        return;
+      }
+      try {
+        const remote = await api.getConfiguration("default");
+        if (cancelled) return;
+        setConfig(remote);
+        saveAdminConfig(remote); // keep local cache in sync
+        setSource("server");
+      } catch {
+        if (cancelled) return;
+        setConfig(loadAdminConfig());
+        setSource("local");
+        setMessage("Could not load server config — showing local cache.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const update = useCallback((patch: Partial<GameConfig>) => {
@@ -31,20 +60,59 @@ export function useAdminConfig() {
     setMessage(null);
   }, []);
 
-  const save = useCallback(() => {
+  const save = useCallback(async () => {
     if (!config) return;
-    const next = saveAdminConfig(config);
-    setConfig(next);
-    setSavedAt(new Date().toLocaleTimeString());
-    setMessage("Configuration saved. New heats will use these numbers.");
+    setSaving(true);
+    setMessage(null);
+    try {
+      // Always write local cache so mock heats / offline still work
+      const localNext = saveAdminConfig(config);
+      if (USE_MOCK) {
+        setConfig(localNext);
+        setSource("local");
+        setSavedAt(new Date().toLocaleTimeString());
+        setMessage("Saved locally. New mock heats will use these numbers.");
+        return;
+      }
+      const remote = await api.putConfiguration(localNext);
+      saveAdminConfig(remote);
+      setConfig(remote);
+      setSource("server");
+      setSavedAt(new Date().toLocaleTimeString());
+      setMessage(
+        "Saved to server. New heats (live API) will snapshot these numbers.",
+      );
+    } catch (e) {
+      const { message: msg } = parseApiFailure(e);
+      setMessage(`Save failed: ${msg}`);
+    } finally {
+      setSaving(false);
+    }
   }, [config]);
 
-  const reset = useCallback(() => {
+  const reset = useCallback(async () => {
     if (!confirm("Reset all game numbers to the default EU seed?")) return;
-    const next = resetAdminConfig();
-    setConfig(next);
-    setSavedAt(new Date().toLocaleTimeString());
-    setMessage("Reset to default configuration.");
+    setSaving(true);
+    try {
+      const next = resetAdminConfig();
+      if (!USE_MOCK) {
+        const remote = await api.putConfiguration(cloneDefaultConfig());
+        saveAdminConfig(remote);
+        setConfig(remote);
+        setSource("server");
+        setMessage("Reset to EU seed on server.");
+      } else {
+        setConfig(next);
+        setSource("local");
+        setMessage("Reset to default configuration (local).");
+      }
+      setSavedAt(new Date().toLocaleTimeString());
+    } catch (e) {
+      const { message: msg } = parseApiFailure(e);
+      setMessage(`Reset failed: ${msg}`);
+    } finally {
+      setSaving(false);
+    }
   }, []);
 
   const bumpVersion = useCallback(() => {
@@ -58,7 +126,20 @@ export function useAdminConfig() {
     );
   }, []);
 
-  return { config, setConfig, update, save, reset, bumpVersion, savedAt, message, setMessage };
+  return {
+    config,
+    setConfig,
+    update,
+    save,
+    reset,
+    bumpVersion,
+    savedAt,
+    message,
+    setMessage,
+    saving,
+    source,
+    useMock: USE_MOCK,
+  };
 }
 
 export function GameIdentitySection({

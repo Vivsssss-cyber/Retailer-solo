@@ -14,6 +14,7 @@ Math is **not reimplemented** — handlers call `src/engine/*` (PRD source of tr
 | Area | Status | Location |
 |---|---|---|
 | Config seed + GET | Done | `GET /configurations/:id`, `GET /events/:id/configuration` |
+| Config admin PUT | Done | `PUT /configurations/:id` + `X-Admin-Pin` → active seed |
 | Heats create/get | Done | `POST /heats`, `GET /heats/:id`, `GET /heats/by-code/:code` |
 | Attempts create/get | Done | `POST …/attempts`, `GET /attempts/:id` |
 | Round submit (authoritative) | Done | `POST /attempts/:id/rounds` |

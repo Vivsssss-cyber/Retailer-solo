@@ -15,7 +15,7 @@ import {
   type LeaderboardRow,
   type RoundRecord,
 } from "@/engine";
-import { loadAdminConfig } from "@/lib/adminConfigStore";
+import { loadAdminConfig, saveAdminConfig } from "@/lib/adminConfigStore";
 import type {
   CompleteAttemptResponse,
   CreateAttemptRequest,
@@ -210,6 +210,10 @@ function processOrder(attempt: Attempt, placedOrder: number): { attempt: Attempt
 export const mockAdapter: RetailerChallengeApi = {
   async getConfiguration() {
     return activeConfig();
+  },
+
+  async putConfiguration(config) {
+    return saveAdminConfig(config);
   },
 
   async createHeat(body: CreateHeatRequest): Promise<CreateHeatResponse> {

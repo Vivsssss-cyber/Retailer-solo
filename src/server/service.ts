@@ -500,13 +500,42 @@ export function getGlobalLeaderboard(
   );
 }
 
-/** Admin / test: upsert a configuration. */
-export async function upsertConfiguration(config: GameConfig): Promise<GameConfig> {
+/**
+ * Admin upsert: normalize, store under id, and set as active default
+ * so new heats snapshot this config.
+ */
+export async function upsertConfiguration(
+  config: GameConfig,
+  opts?: { makeDefault?: boolean },
+): Promise<GameConfig> {
+  // Lazy import avoids circular deps; normalize is pure.
+  const { normalizeGameConfig } = await import("@/lib/adminConfigStore");
   return updateStore((store) => {
-    store.configurations[config.configuration_id] = structuredClone(config);
-    if (config.configuration_id === DEFAULT_CONFIG.configuration_id) {
-      store.configurations["default"] = store.configurations[config.configuration_id]!;
+    const next = normalizeGameConfig(config);
+    store.configurations[next.configuration_id] = structuredClone(next);
+
+    const makeDefault = opts?.makeDefault !== false;
+    if (makeDefault) {
+      store.configurations["default"] = structuredClone(next);
+      const ev = store.events[DEFAULT_EVENT_ID];
+      if (ev) {
+        ev.configuration_id = next.configuration_id;
+      } else {
+        store.events[DEFAULT_EVENT_ID] = {
+          event_id: DEFAULT_EVENT_ID,
+          name: "Default event",
+          configuration_id: next.configuration_id,
+        };
+      }
+    } else if (next.configuration_id === DEFAULT_CONFIG.configuration_id) {
+      store.configurations["default"] = structuredClone(next);
     }
-    return structuredClone(config);
+
+    return structuredClone(next);
   });
+}
+
+/** Reset active config to EU seed. */
+export async function resetConfigurationToDefault(): Promise<GameConfig> {
+  return upsertConfiguration(structuredClone(DEFAULT_CONFIG), { makeDefault: true });
 }

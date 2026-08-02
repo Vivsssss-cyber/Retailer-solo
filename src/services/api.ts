@@ -1,3 +1,5 @@
+import type { GameConfig } from "@/engine";
+import { ADMIN_PIN } from "@/lib/adminConfigStore";
 import type { RetailerChallengeApi } from "./types";
 import { mockAdapter } from "./mockAdapter";
 import { ApiRequestError } from "./apiErrors";
@@ -40,6 +42,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 const liveApi: RetailerChallengeApi = {
   getConfiguration: (id = "default") => request(`/configurations/${id}`),
+  putConfiguration: (config: GameConfig) =>
+    request(`/configurations/${encodeURIComponent(config.configuration_id || "default")}`, {
+      method: "PUT",
+      body: JSON.stringify(config),
+      headers: {
+        "X-Admin-Pin": ADMIN_PIN,
+      },
+    }),
   createHeat: (body) =>
     request(`/heats`, { method: "POST", body: JSON.stringify(body) }),
   createAttempt: (heatId, body) =>

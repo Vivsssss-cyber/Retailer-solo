@@ -21,6 +21,9 @@ export default function AdminGamePage() {
     savedAt,
     message,
     setMessage,
+    saving,
+    source,
+    useMock,
   } = useAdminConfig();
 
   if (!config) {
@@ -31,6 +34,8 @@ export default function AdminGamePage() {
     );
   }
 
+  const isError = message?.startsWith("Save failed") || message?.startsWith("Reset failed");
+
   return (
     <AdminShell
       title="Game numbers"
@@ -40,22 +45,51 @@ export default function AdminGamePage() {
           <GameButton type="button" size="sm" variant="outline" onClick={bumpVersion}>
             Bump version
           </GameButton>
-          <GameButton type="button" size="sm" variant="secondary" onClick={reset}>
+          <GameButton
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={saving}
+            onClick={() => void reset()}
+          >
             Reset default
           </GameButton>
-          <GameButton type="button" size="sm" onClick={save}>
-            Save
+          <GameButton
+            type="button"
+            size="sm"
+            disabled={saving}
+            onClick={() => void save()}
+          >
+            {saving ? "Saving…" : "Save"}
           </GameButton>
         </>
       }
     >
+      <p
+        style={{
+          fontFamily: FO,
+          fontSize: 12,
+          fontWeight: 600,
+          color: "var(--sv-text-muted)",
+          marginBottom: 10,
+        }}
+      >
+        Active source:{" "}
+        <span style={{ color: "var(--sv-teal-mid)" }}>
+          {useMock ? "mock (localStorage)" : source === "server" ? "server API" : "local cache"}
+        </span>
+        {useMock
+          ? " · Set NEXT_PUBLIC_USE_MOCK=false to write the live backend."
+          : " · Saves push to the API (new heats snapshot server config)."}
+      </p>
+
       {message && (
         <p
           style={{
             fontFamily: FO,
             fontSize: 13,
             fontWeight: 600,
-            color: "var(--sv-positive)",
+            color: isError ? "var(--sv-negative)" : "var(--sv-positive)",
             marginBottom: 12,
           }}
         >
@@ -70,10 +104,15 @@ export default function AdminGamePage() {
       <ImportExportSection config={config} setConfig={setConfig} setMessage={setMessage} />
 
       <div className="flex flex-wrap gap-2 sticky bottom-4 z-10">
-        <GameButton type="button" onClick={save}>
-          Save configuration
+        <GameButton type="button" disabled={saving} onClick={() => void save()}>
+          {saving ? "Saving…" : "Save configuration"}
         </GameButton>
-        <GameButton type="button" variant="outline" onClick={reset}>
+        <GameButton
+          type="button"
+          variant="outline"
+          disabled={saving}
+          onClick={() => void reset()}
+        >
           Reset to EU seed
         </GameButton>
       </div>

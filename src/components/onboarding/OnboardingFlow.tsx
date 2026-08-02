@@ -20,6 +20,7 @@ import {
 import { useAttemptStore } from "@/store/useAttemptStore";
 import { DEFAULT_CONFIG, type GameConfig } from "@/engine";
 import { loadAdminConfig } from "@/lib/adminConfigStore";
+import { api, USE_MOCK } from "@/services/api";
 import {
   PERSONA_AVATAR_PLACEHOLDER,
   PERSONAS,
@@ -921,8 +922,25 @@ export default function OnboardingFlow() {
   const [hostError, setHostError] = useState<string | null>(null);
 
   useEffect(() => {
-    const t = window.setTimeout(() => setGameConfig(loadAdminConfig()), 0);
-    return () => window.clearTimeout(t);
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      void (async () => {
+        if (USE_MOCK) {
+          if (!cancelled) setGameConfig(loadAdminConfig());
+          return;
+        }
+        try {
+          const remote = await api.getConfiguration("default");
+          if (!cancelled) setGameConfig(remote);
+        } catch {
+          if (!cancelled) setGameConfig(loadAdminConfig());
+        }
+      })();
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
   }, []);
 
   const [data, setData] = useState(() => ({

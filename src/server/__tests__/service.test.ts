@@ -11,6 +11,7 @@ import {
   getGlobalLeaderboard,
   getHeatLeaderboard,
   submitRound,
+  upsertConfiguration,
 } from "../service";
 
 beforeEach(() => {
@@ -28,6 +29,24 @@ describe("configuration", () => {
   it("resolves default alias", () => {
     const config = getConfiguration("default");
     expect(config.configuration_id).toBe(DEFAULT_CONFIG.configuration_id);
+  });
+
+  it("upsert becomes active seed for new heats", async () => {
+    const patched = {
+      ...DEFAULT_CONFIG,
+      total_rounds: 8,
+      customer_demand_by_round: [5, 5, 5, 5, 5, 5, 5, 5],
+      supply_rate_by_round: [1, 1, 1, 1, 1, 1, 1, 1],
+      configuration_version: 2,
+    };
+    await upsertConfiguration(patched);
+    const active = getConfiguration("default");
+    expect(active.total_rounds).toBe(8);
+    expect(active.configuration_version).toBe(2);
+
+    const heat = await createHeat({ solo: true });
+    expect(heat.configuration.total_rounds).toBe(8);
+    expect(heat.configuration.configuration_version).toBe(2);
   });
 });
 

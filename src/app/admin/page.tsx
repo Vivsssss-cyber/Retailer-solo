@@ -13,15 +13,33 @@ import {
   Wallet,
 } from "@/components/admin/AdminShell";
 import { loadAdminConfig, readMockStoreStats } from "@/lib/adminConfigStore";
+import { api, USE_MOCK } from "@/services/api";
 import type { GameConfig } from "@/engine";
 
 export default function AdminOverviewPage() {
   const [config, setConfig] = useState<GameConfig | null>(null);
-  const [stats, setStats] = useState(readMockStoreStats());
+  const [stats] = useState(() => readMockStoreStats());
 
   useEffect(() => {
-    setConfig(loadAdminConfig());
-    setStats(readMockStoreStats());
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      void (async () => {
+        if (USE_MOCK) {
+          if (!cancelled) setConfig(loadAdminConfig());
+          return;
+        }
+        try {
+          const remote = await api.getConfiguration("default");
+          if (!cancelled) setConfig(remote);
+        } catch {
+          if (!cancelled) setConfig(loadAdminConfig());
+        }
+      })();
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
   }, []);
 
   if (!config) {

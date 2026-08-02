@@ -50,6 +50,8 @@ export interface CompleteAttemptResponse {
 
 export interface RetailerChallengeApi {
   getConfiguration(configurationId?: string): Promise<GameConfig>;
+  /** Admin write — live API requires X-Admin-Pin; mock writes localStorage. */
+  putConfiguration(config: GameConfig): Promise<GameConfig>;
   createHeat(body: CreateHeatRequest): Promise<CreateHeatResponse>;
   createAttempt(heatId: string, body: CreateAttemptRequest): Promise<Attempt>;
   getAttempt(attemptId: string): Promise<Attempt | null>;
