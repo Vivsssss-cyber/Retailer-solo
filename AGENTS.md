@@ -129,8 +129,8 @@ Copy `.env.example` → `.env.local`:
 
 ### Known frontend gaps
 
-- Create-heat + show access code UX  
-- Live board polling during play  
+- ~~Create-heat + show access code UX~~ (done: Host a Heat mode + code share + header badge)  
+- ~~Live board polling during play~~ (done: 4s poll while status=playing)  
 - True single-screen no-scroll densify  
 - Official one-attempt UX  
 

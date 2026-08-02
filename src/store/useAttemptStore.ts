@@ -13,6 +13,27 @@ import { calculateReport } from "@/engine";
 import { api } from "@/services/api";
 import { getOpeningPreview } from "@/services/mockAdapter";
 
+const HEAT_CODE_KEY = "retailer-challenge-heat-code";
+
+function persistHeatCode(code: string | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (code) sessionStorage.setItem(HEAT_CODE_KEY, code);
+    else sessionStorage.removeItem(HEAT_CODE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function readPersistedHeatCode(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return sessionStorage.getItem(HEAT_CODE_KEY);
+  } catch {
+    return null;
+  }
+}
+
 interface AttemptState {
   phase: UiPhase;
   attempt: Attempt | null;
@@ -25,11 +46,21 @@ interface AttemptState {
   heatRank: number | null;
   globalRank: number | null;
   heatWinnerCost: number | null;
+  /** Access code for the current heat (host/join) — shown in header for sharing. */
+  heatAccessCode: string | null;
   error: string | null;
   submitting: boolean;
   skipAnimation: boolean;
 
   startSolo: (playerName: string) => Promise<string>;
+  /**
+   * Create a multiplayer heat and return codes without starting an attempt.
+   * Host shows the code, then calls joinHeat(heat_id, name).
+   */
+  createHostedHeat: (playerName?: string) => Promise<{
+    heat_id: string;
+    access_code: string;
+  }>;
   joinHeat: (heatIdOrCode: string, playerName: string) => Promise<string>;
   hydrate: (attemptId: string) => Promise<void>;
   setOrderInput: (n: number) => void;
@@ -56,6 +87,7 @@ const initial = {
   heatRank: null as number | null,
   globalRank: null as number | null,
   heatWinnerCost: null as number | null,
+  heatAccessCode: null as string | null,
   error: null as string | null,
   submitting: false,
   skipAnimation: false,
@@ -73,6 +105,7 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
     set({ error: null, submitting: true });
     try {
       const heat = await api.createHeat({ solo: true, player_name: playerName });
+      persistHeatCode(heat.access_code);
       const attempt = await api.createAttempt(heat.heat_id, {
         player_name: playerName,
       });
@@ -82,6 +115,7 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
         opening,
         phase: "decide",
         orderInput: opening?.customerDemand ?? 4,
+        heatAccessCode: heat.access_code,
         submitting: false,
       });
       await get().refreshLeaderboards();
@@ -92,9 +126,38 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
     }
   },
 
+  async createHostedHeat(playerName?: string) {
+    set({ error: null, submitting: true });
+    try {
+      const heat = await api.createHeat({
+        solo: false,
+        player_name: playerName,
+      });
+      persistHeatCode(heat.access_code);
+      set({
+        heatAccessCode: heat.access_code,
+        submitting: false,
+      });
+      return { heat_id: heat.heat_id, access_code: heat.access_code };
+    } catch (e) {
+      set({
+        error: e instanceof Error ? e.message : "Failed to create heat",
+        submitting: false,
+      });
+      throw e;
+    }
+  },
+
   async joinHeat(heatIdOrCode: string, playerName: string) {
     set({ error: null, submitting: true });
     try {
+      // If joining by short code (not heat_ id), remember it for the header.
+      const looksLikeCode = !heatIdOrCode.startsWith("heat_");
+      if (looksLikeCode) {
+        const code = heatIdOrCode.trim().toUpperCase();
+        persistHeatCode(code);
+        set({ heatAccessCode: code });
+      }
       const attempt = await api.createAttempt(heatIdOrCode, {
         player_name: playerName,
       });
@@ -104,6 +167,7 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
         opening,
         phase: "decide",
         orderInput: opening?.customerDemand ?? 4,
+        heatAccessCode: get().heatAccessCode ?? readPersistedHeatCode(),
         submitting: false,
       });
       await get().refreshLeaderboards();
@@ -115,7 +179,7 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
   },
 
   async hydrate(attemptId: string) {
-    set({ error: null });
+    set({ error: null, heatAccessCode: readPersistedHeatCode() });
     try {
       const attempt = await api.getAttempt(attemptId);
       if (!attempt) {
@@ -130,6 +194,7 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
           phase: "report",
           report,
           lastRecord: attempt.rounds[attempt.rounds.length - 1] ?? null,
+          heatAccessCode: readPersistedHeatCode(),
         });
         await get().loadReport();
         return;
@@ -140,6 +205,7 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
         opening,
         phase: "decide",
         orderInput: opening?.customerDemand ?? 4,
+        heatAccessCode: readPersistedHeatCode(),
       });
       await get().refreshLeaderboards();
     } catch (e) {
@@ -259,7 +325,7 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
       });
       await get().refreshLeaderboards();
       return next.attempt_id;
-    } catch (e) {
+    } catch {
       // Heat may be full — create a new solo heat instead
       try {
         const heat = await api.createHeat({ solo: true, player_name: playerName });
@@ -293,6 +359,7 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
   },
 
   reset() {
-    set({ ...initial });
+    // Keep heat code in session for refresh; full clear only drops in-memory UI.
+    set({ ...initial, heatAccessCode: readPersistedHeatCode() });
   },
 }));

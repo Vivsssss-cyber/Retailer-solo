@@ -32,6 +32,7 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
     heatRank,
     globalRank,
     heatWinnerCost,
+    heatAccessCode,
     error,
     submitting,
     hydrate,
@@ -45,6 +46,22 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
   useEffect(() => {
     void hydrate(attemptId);
   }, [attemptId, hydrate]);
+
+  const pollAttemptId = attempt?.attempt_id;
+  const pollStatus = attempt?.status;
+
+  // Live heat board: poll while playing (PRD / backend guide: 3–5s).
+  useEffect(() => {
+    if (!pollAttemptId || pollStatus === "completed" || phase === "report") {
+      return;
+    }
+    const POLL_MS = 4000;
+    const tick = () => {
+      void useAttemptStore.getState().refreshLeaderboards();
+    };
+    const id = window.setInterval(tick, POLL_MS);
+    return () => window.clearInterval(id);
+  }, [pollAttemptId, pollStatus, phase]);
 
   if (!attempt) {
     return (
@@ -113,7 +130,12 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
             paddingBottom: isRoundFlow ? 24 : 108,
           }}
         >
-          <GameHeader attempt={attempt} livePosition={pos} onHowToPlayClick={() => setShowRules(true)} />
+          <GameHeader
+            attempt={attempt}
+            livePosition={pos}
+            heatAccessCode={heatAccessCode}
+            onHowToPlayClick={() => setShowRules(true)}
+          />
 
           {error && (
             <p style={{ fontFamily: FO, fontSize: 12, color: "var(--sv-negative)" }}>{error}</p>

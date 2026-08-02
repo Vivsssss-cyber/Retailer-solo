@@ -32,10 +32,13 @@ function usePlayerIdentity(): {
 export function GameHeader({
   attempt,
   livePosition,
+  heatAccessCode,
   onHowToPlayClick,
 }: {
   attempt: Attempt;
   livePosition: number | null;
+  /** Multiplayer heat code — shown so host can re-share mid-game. */
+  heatAccessCode?: string | null;
   onHowToPlayClick?: () => void;
 }) {
   const { avatarSrc, personaName } = usePlayerIdentity();
@@ -142,6 +145,9 @@ export function GameHeader({
             />
 
             <div className="flex items-center gap-1.5 sm:gap-2">
+              {heatAccessCode && !heatAccessCode.startsWith("SOLO-") && (
+                <MetricPill label="Heat code" value={heatAccessCode} accent />
+              )}
               <MetricPill label="Cum. cost" value={`$${costStr}`} accent />
               {livePosition != null && (
                 <MetricPill label="Live pos" value={`#${livePosition}`} />

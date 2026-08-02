@@ -36,10 +36,13 @@ import { CoachSpeech } from "@/components/coach";
 const COACH_LINES: Record<string, string> = {
   welcome: "I'm your coach. Before we open the warehouse — let's get you set up.",
   identity: "Pick a face and a name. Cosmetic only — scoring stays fair.",
-  mode: "Solo to learn the ropes — or join a heat and compete.",
+  mode: "Solo to practice, host a heat for your class, or join with a code.",
   heatCode: "Ask your host for the code. Then we can join the heat.",
+  hostShare: "Share this code with your group. They join from the home screen.",
   loading: "Locking in your setup. Warehouse opens in a second…",
 };
+
+type PlayMode = "solo" | "host" | "heat";
 
 // ---------------------------------------------------------
 // Helpers
@@ -394,56 +397,64 @@ function ModeScreen({
   onChange,
   onNext,
 }: {
-  value: "solo" | "heat";
-  onChange: (v: "solo" | "heat") => void;
+  value: PlayMode;
+  onChange: (v: PlayMode) => void;
   onNext: () => void;
 }) {
+  const options: {
+    id: PlayMode;
+    title: string;
+    blurb: string;
+    icon: React.ReactNode;
+  }[] = [
+    {
+      id: "solo",
+      title: "Solo Practice",
+      blurb: "Learn the ropes on your own heat.",
+      icon: <Target size={20} color="currentColor" />,
+    },
+    {
+      id: "host",
+      title: "Host a Heat",
+      blurb: "Create a code and invite up to 4 players.",
+      icon: <Users size={20} color="currentColor" />,
+    },
+    {
+      id: "heat",
+      title: "Join a Heat",
+      blurb: "Enter a code from your host or instructor.",
+      icon: <Package size={20} color="currentColor" />,
+    },
+  ];
+
   return (
     <GlassCard className="p-4">
       <h2 style={{ fontFamily: FO, fontWeight: 700, fontSize: 24, color: "var(--sv-ink)", marginBottom: 24 }}>
         How do you want to play?
       </h2>
       <div className="flex flex-col gap-3 mb-8">
-        <SelectionCard active={value === "solo"} onClick={() => onChange("solo")}>
-          <div className="flex items-center gap-3 w-full">
-            <div
-              style={{
-                background: value === "solo" ? "var(--sv-teal-mid)" : "var(--sv-border)",
-                color: "white",
-                padding: 8,
-                borderRadius: 8,
-              }}
-            >
-              <Target size={20} color="currentColor" />
-            </div>
-            <div className="text-left flex-1">
-              <div style={{ fontFamily: FO, fontWeight: 600, fontSize: 15 }}>Solo Practice</div>
-              <div style={{ fontFamily: FO, fontSize: 12, color: "var(--sv-text-muted)", marginTop: 2 }}>
-                Play offline against the system.
+        {options.map((opt) => (
+          <SelectionCard key={opt.id} active={value === opt.id} onClick={() => onChange(opt.id)}>
+            <div className="flex items-center gap-3 w-full">
+              <div
+                style={{
+                  background: value === opt.id ? "var(--sv-teal-mid)" : "var(--sv-border)",
+                  color: "white",
+                  padding: 8,
+                  borderRadius: 8,
+                }}
+              >
+                {opt.icon}
+              </div>
+              <div className="text-left flex-1">
+                <div style={{ fontFamily: FO, fontWeight: 600, fontSize: 15 }}>{opt.title}</div>
+                <div style={{ fontFamily: FO, fontSize: 12, color: "var(--sv-text-muted)", marginTop: 2 }}>
+                  {opt.blurb}
+                </div>
               </div>
             </div>
-          </div>
-        </SelectionCard>
-        <SelectionCard active={value === "heat"} onClick={() => onChange("heat")}>
-          <div className="flex items-center gap-3 w-full">
-            <div
-              style={{
-                background: value === "heat" ? "var(--sv-teal-mid)" : "var(--sv-border)",
-                color: "white",
-                padding: 8,
-                borderRadius: 8,
-              }}
-            >
-              <Users size={20} color="currentColor" />
-            </div>
-            <div className="text-left flex-1">
-              <div style={{ fontFamily: FO, fontWeight: 600, fontSize: 15 }}>Join a Heat</div>
-              <div style={{ fontFamily: FO, fontSize: 12, color: "var(--sv-text-muted)", marginTop: 2 }}>
-                Compete with your class or team.
-              </div>
-            </div>
-          </div>
-        </SelectionCard>
+          </SelectionCard>
+        ))}
       </div>
       <GameButton size="lg" style={{ width: "100%" }} onClick={onNext}>
         Continue
@@ -520,6 +531,161 @@ function HeatCodeScreen({
   );
 }
 
+/** Host path: create heat, show shareable code, then enter as first player. */
+function HostShareScreen({
+  accessCode,
+  heatId,
+  creating,
+  error,
+  onCreate,
+  onEnter,
+  onBack,
+}: {
+  accessCode: string | null;
+  heatId: string | null;
+  creating: boolean;
+  error: string | null;
+  onCreate: () => void;
+  onEnter: () => void;
+  onBack: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!accessCode && !creating && !error) {
+      onCreate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- create once on mount
+  }, []);
+
+  const copyCode = async () => {
+    if (!accessCode) return;
+    try {
+      await navigator.clipboard.writeText(accessCode);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* fallback: select via prompt-less ignore */
+    }
+  };
+
+  return (
+    <GlassCard className="p-4 text-center">
+      <h2
+        style={{
+          fontFamily: FO,
+          fontWeight: 700,
+          fontSize: 24,
+          color: "var(--sv-ink)",
+          marginBottom: 8,
+        }}
+      >
+        Your heat code
+      </h2>
+      <p
+        style={{
+          fontFamily: FO,
+          fontSize: 14,
+          color: "var(--sv-text-secondary)",
+          marginBottom: 24,
+        }}
+      >
+        Share this with your group. Up to 4 players can join, including you.
+      </p>
+
+      {creating && !accessCode && (
+        <div className="flex justify-center mb-6">
+          <div className="w-10 h-10 border-4 border-t-[var(--sv-teal-mid)] border-b-[var(--sv-teal-mid)] border-l-transparent border-r-transparent rounded-full animate-spin" />
+        </div>
+      )}
+
+      {accessCode && (
+        <>
+          <div
+            style={{
+              fontFamily: FO,
+              fontWeight: 800,
+              fontSize: 36,
+              letterSpacing: "0.18em",
+              color: "var(--sv-teal-mid)",
+              padding: "20px 16px",
+              borderRadius: 16,
+              border: "1.5px solid var(--sv-border)",
+              background: "var(--sv-cyan-tint)",
+              marginBottom: 12,
+              userSelect: "all",
+            }}
+          >
+            {accessCode}
+          </div>
+          <button
+            type="button"
+            onClick={() => void copyCode()}
+            style={{
+              fontFamily: FO,
+              fontSize: 13,
+              fontWeight: 700,
+              color: "var(--sv-teal-mid)",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              marginBottom: 24,
+              textDecoration: "underline",
+            }}
+          >
+            {copied ? "Copied" : "Copy code"}
+          </button>
+        </>
+      )}
+
+      {error && (
+        <p
+          style={{
+            fontFamily: FO,
+            fontSize: 14,
+            color: "var(--sv-negative)",
+            marginBottom: 16,
+          }}
+        >
+          {error}
+        </p>
+      )}
+
+      <div className="flex flex-col gap-2">
+        <GameButton
+          size="lg"
+          style={{ width: "100%" }}
+          disabled={!heatId || creating}
+          onClick={onEnter}
+        >
+          Enter heat & play
+        </GameButton>
+        {error && (
+          <GameButton size="md" variant="ghost" style={{ width: "100%" }} onClick={onCreate}>
+            Try create again
+          </GameButton>
+        )}
+        <button
+          type="button"
+          onClick={onBack}
+          style={{
+            fontFamily: FO,
+            fontSize: 13,
+            color: "var(--sv-text-muted)",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            textDecoration: "underline",
+            padding: 8,
+          }}
+        >
+          Back
+        </button>
+      </div>
+    </GlassCard>
+  );
+}
+
 function LoadingScreen({
   onStart,
   submitting,
@@ -562,9 +728,22 @@ function LoadingScreen({
 
 export default function OnboardingFlow() {
   const router = useRouter();
-  const { startSolo, joinHeat, submitting, error, reset } = useAttemptStore();
+  const {
+    startSolo,
+    joinHeat,
+    createHostedHeat,
+    submitting,
+    error,
+    reset,
+  } = useAttemptStore();
   const [gameConfig, setGameConfig] = useState<GameConfig>(DEFAULT_CONFIG);
   const [hoverPersona, setHoverPersona] = useState<PersonaSlug | null>(null);
+  const [hostedHeat, setHostedHeat] = useState<{
+    heat_id: string;
+    access_code: string;
+  } | null>(null);
+  const [hostCreating, setHostCreating] = useState(false);
+  const [hostError, setHostError] = useState<string | null>(null);
 
   useEffect(() => {
     const t = window.setTimeout(() => setGameConfig(loadAdminConfig()), 0);
@@ -574,7 +753,7 @@ export default function OnboardingFlow() {
   const [data, setData] = useState({
     persona: "" as PersonaSlug | "",
     name: "",
-    mode: "solo" as "solo" | "heat",
+    mode: "solo" as PlayMode,
     heatCode: "",
   });
 
@@ -591,10 +770,28 @@ export default function OnboardingFlow() {
         });
       }
     }
+    // Changing mode drops any staged host heat so codes don't leak across modes.
+    if (key === "mode") {
+      setHostedHeat(null);
+      setHostError(null);
+    }
   };
 
   const [stepIndex, setStepIndex] = useState(0);
   const next = () => setStepIndex((s) => s + 1);
+
+  const handleCreateHostedHeat = async () => {
+    setHostCreating(true);
+    setHostError(null);
+    try {
+      const heat = await createHostedHeat(data.name.trim() || "Host");
+      setHostedHeat(heat);
+    } catch (e) {
+      setHostError(e instanceof Error ? e.message : "Could not create heat");
+    } finally {
+      setHostCreating(false);
+    }
+  };
 
   const allScreens = [
     { id: "welcome", component: <WelcomeScreen config={gameConfig} onNext={next} /> },
@@ -636,6 +833,28 @@ export default function OnboardingFlow() {
           },
         ]
       : []),
+    ...(data.mode === "host"
+      ? [
+          {
+            id: "hostShare",
+            component: (
+              <HostShareScreen
+                accessCode={hostedHeat?.access_code ?? null}
+                heatId={hostedHeat?.heat_id ?? null}
+                creating={hostCreating || submitting}
+                error={hostError || error}
+                onCreate={() => void handleCreateHostedHeat()}
+                onEnter={next}
+                onBack={() => {
+                  setHostedHeat(null);
+                  setHostError(null);
+                  setStepIndex((s) => Math.max(0, s - 1));
+                }}
+              />
+            ),
+          },
+        ]
+      : []),
     {
       id: "loading",
       component: (
@@ -649,10 +868,17 @@ export default function OnboardingFlow() {
               persona: data.persona || null,
               name: player,
             });
-            reset();
+            // Do not wipe heatAccessCode set by createHostedHeat / join.
             try {
               if (data.mode === "solo") {
+                reset();
                 const id = await startSolo(player);
+                router.push(`/play/${id}`);
+              } else if (data.mode === "host") {
+                if (!hostedHeat?.heat_id) {
+                  throw new Error("Heat not ready — go back and create a code");
+                }
+                const id = await joinHeat(hostedHeat.heat_id, player);
                 router.push(`/play/${id}`);
               } else {
                 const id = await joinHeat(data.heatCode.trim(), player);
@@ -735,7 +961,8 @@ export default function OnboardingFlow() {
 
             {safeIndex > 0 &&
               safeIndex < allScreens.length - 1 &&
-              stepId !== "heatCode" && (
+              stepId !== "heatCode" &&
+              stepId !== "hostShare" && (
                 <button
                   type="button"
                   onClick={() => setStepIndex((s) => Math.max(0, s - 1))}
