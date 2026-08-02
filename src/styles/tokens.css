@@ -1,0 +1,109 @@
+/* 
+  =============================================================================
+  CYAN DESIGN SYSTEM — STANDALONE DESIGN TOKENS
+  =============================================================================
+  Namespace: --sv-* (Simulations Visual Design System)
+  Description: Complete theme palette, glassmorphism card properties, typography,
+               shadows, gradients, and subtle micro-animation variables.
+  =============================================================================
+*/
+
+/* Outfit is loaded via next/font in app/layout.tsx as --font-outfit */
+
+:root {
+  /* Typography */
+  --sv-font-ui: var(--font-outfit), "Outfit", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --sv-font-mono: "Courier New", "Lucida Console", Monaco, monospace;
+
+  /* Base Canvas & Text Colors */
+  --sv-background: #eff2f4;
+  --sv-foreground: #002c33;
+  --sv-text: #202326;
+  --sv-text-secondary: #606569;
+  --sv-text-muted: #6b7785;
+
+  /* Surfaces & Containers */
+  --sv-card: rgba(255, 255, 255, 0.65);
+  --sv-card-solid: #ffffff;
+  --sv-muted: #f0f6fa;
+  --sv-muted-700: #8A9093;
+  --sv-cyan-tint: #e0f7ff;
+  --sv-border: #c8dde6;
+
+  /* Core Brand Cyan / Teal Ramp */
+  --sv-cyan-bright: #00d2ff;
+  --sv-cyan: #00c1eb;
+  --sv-teal-light: #00a0c2;
+  --sv-teal-mid: #006e85;
+  --sv-teal: #005f58;
+  --sv-teal-dark: #003c49;
+  --sv-ink: #002c33;
+
+  /* Status & Indicator Colors */
+  --sv-positive: #156162;
+  --sv-success: #166534;
+  --sv-warning: #b45309;
+  --sv-negative: #c65252;
+  --sv-destructive: #c0392b;
+
+  /* Simulation Chart Color Spectrum */
+  --sv-chart-1: #00c1eb;
+  --sv-chart-2: #003d47;
+  --sv-chart-3: #7c3aed;
+  --sv-chart-4: #b45309;
+  --sv-chart-5: #c0392b;
+  --sv-chart-6: #4db5b6;
+
+  /* Border Radii */
+  --sv-radius-sm: 6px;
+  --sv-radius-md: 8px;
+  --sv-radius-lg: 10px;
+  --sv-radius-xl: 14px;
+  --sv-radius-2xl: 16px;
+  --sv-radius-pill: 9999px;
+
+  /* Elevation Shadows */
+  --sv-shadow-1: 0px 2px 4px rgba(0, 0, 0, 0.04);
+  --sv-shadow-2: 0px 3px 8px rgba(0, 0, 0, 0.06);
+  --sv-shadow-3: 0px 2.5px 10px 0px rgba(77, 181, 182, 0.29);
+
+  /* Strategic Gradients */
+  --sv-gradient-strategic: linear-gradient(135deg, #006e85, #003d47);
+  --sv-gradient-report: linear-gradient(to right, #f0f9fc, #ffffff);
+  
+  /* Layout Dimensions */
+  --sv-grid-size: 63px;
+  --sv-max-page-width: 1288px;
+}
+
+/* Global Font Application */
+body {
+  font-family: var(--sv-font-ui);
+  background-color: var(--sv-background);
+  color: var(--sv-foreground);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular Numbers for Metrics & Counters */
+.sv-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Glassmorphism Card Utility */
+.sv-card-glass {
+  background: var(--sv-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.4px solid #ffffff;
+  border-radius: var(--sv-radius-2xl);
+  box-shadow: 0 4px 14px rgba(0, 44, 51, 0.04);
+}
+
+/* Blueprint Grid Background Pattern */
+.sv-grid-bg {
+  background-color: #eff2f4;
+  background-image: 
+    linear-gradient(to right, rgba(0, 110, 133, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 110, 133, 0.04) 1px, transparent 1px);
+  background-size: var(--sv-grid-size) var(--sv-grid-size);
+}

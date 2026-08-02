@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Beer Game Sprint: The Retailer Challenge
 
-## Getting Started
+Independent Next.js app for the EU single-player supply-chain challenge.
 
-First, run the development server:
+- **Design:** Cyan system (ported from `classic-simulations-frontend`)  
+- **Rules:** `../Retailer Challenge.pdf`  
+- **Agents / AI:** see [`AGENTS.md`](./AGENTS.md) (also loaded via `CLAUDE.md`)
+
+## Quick start
 
 ```bash
+cd retailer-challenge
+npm install
+cp .env.example .env.local   # optional
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) → enter a name → **Solo practice**.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Local dev server |
+| `npm test` | Engine unit tests (Vitest) |
+| `npm run build` | Production build |
+| `npm run lint` | ESLint |
 
-## Learn More
+## Environment
 
-To learn more about Next.js, take a look at the following resources:
+| Variable | Default | Meaning |
+|---|---|---|
+| `NEXT_PUBLIC_USE_MOCK` | mock on | Set `false` to use live API |
+| `NEXT_PUBLIC_API_URL` | unset | Backend base URL |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+See `.env.example`. Never commit `.env.local`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Architecture
 
-## Deploy on Vercel
+| Path | Role |
+|---|---|
+| `src/engine` | Pure PRD math (source of truth) |
+| `src/services/mockAdapter.ts` | Offline heats / attempts / boards |
+| `src/services/api.ts` | Live REST client |
+| `src/store/useAttemptStore.ts` | Play UI state |
+| `docs/BACKEND_GUIDE.md` | **Backend implementer guide** |
+| `docs/API_CONTRACT.md` | Endpoint cheat sheet |
+| `docs/DESIGN_SOURCE.md` | Design provenance |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Relationship to classic simulations
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Sibling product — **not** a mode of the 4-role multiplayer Beer Game.  
+Visual reference: classic route `/demo/beer-game`.
+
+## License / internal
+
+Internal CYAN / project use unless otherwise specified.

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 795 1106">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #004d5c;
+      }
+
+      .cls-2 {
+        fill: #006e85;
+      }
+
+      .cls-3 {
+        fill: #020202;
+      }
+
+      .cls-4 {
+        fill: #002c33;
+      }
+
+      .cls-5 {
+        letter-spacing: 0em;
+      }
+
+      .cls-6 {
+        fill: #00b1d6;
+      }
+
+      .cls-7 {
+        letter-spacing: 0em;
+      }
+
+      .cls-8 {
+        font-family: Montserrat-Bold, Montserrat;
+        font-size: 183.02px;
+        font-weight: 700;
+      }
+
+      .cls-9 {
+        font-family: Montserrat-SemiBold, Montserrat;
+        font-size: 59.77px;
+        font-weight: 600;
+      }
+
+      .cls-10 {
+        letter-spacing: -.01em;
+      }
+
+      .cls-11 {
+        letter-spacing: -.02em;
+      }
+
+      .cls-12 {
+        fill: #00c1eb;
+      }
+
+      .cls-13 {
+        letter-spacing: -.04em;
+      }
+
+      .cls-14 {
+        letter-spacing: 0em;
+      }
+
+      .cls-15 {
+        fill: #0090ad;
+      }
+    </style>
+  </defs>
+  <g>
+    <polygon class="cls-15" points="253.16 329.82 253.16 485.76 118.11 563.73 118.11 251.86 253.16 329.82"/>
+    <polygon class="cls-6" points="386.35 97 386.35 252.93 253.16 329.82 118.11 251.86 386.35 97"/>
+    <polygon class="cls-2" points="386.35 562.65 386.35 718.6 253.16 641.7 118.11 563.73 253.16 485.76 386.35 562.65"/>
+    <polygon class="cls-1" points="657.64 564.25 657.64 564.19 523.11 641.86 523.11 641.73 523.19 641.7 523.11 641.66 523.11 641.73 522.97 641.83 390.07 718.55 390.07 562.8 523.11 485.98 658.16 563.95 657.64 564.25"/>
+    <polygon class="cls-3" points="523.19 641.7 523.11 641.73 523.11 641.66 523.19 641.7"/>
+    <polygon class="cls-3" points="523.19 641.7 523.11 641.73 523.11 641.66 523.19 641.7"/>
+    <polygon class="cls-3" points="657.64 564.19 657.64 564.25 523.11 641.92 523.11 641.86 657.64 564.19"/>
+    <polygon class="cls-3" points="523.11 641.73 523.11 641.92 523.06 641.88 522.97 641.83 523.11 641.73"/>
+    <polygon class="cls-4" points="657.64 564.19 657.64 720.13 522.59 642.16 523.06 641.88 523.11 641.86 657.64 564.19"/>
+    <polygon class="cls-12" points="658.29 251.86 523.24 329.82 390.07 252.93 390.07 97 523.24 173.89 658.29 251.86"/>
+  </g>
+  <g>
+    <text class="cls-8" transform="translate(122.14 913.34)"><tspan class="cls-14" x="0" y="0">C</tspan><tspan class="cls-13" x="132.87" y="0">Y</tspan><tspan x="248.73" y="0">AN</tspan></text>
+    <text class="cls-9" transform="translate(209.88 982.04)"><tspan x="0" y="0">In</tspan><tspan class="cls-5" x="60" y="0">n</tspan><tspan class="cls-10" x="101" y="0">o</tspan><tspan class="cls-11" x="138.66" y="0">v</tspan><tspan class="cls-7" x="172.18" y="0">ations</tspan></text>
+  </g>
+</svg>

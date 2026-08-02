@@ -1,0 +1,298 @@
+"use client";
+
+import { create } from "zustand";
+import type {
+  Attempt,
+  LeaderboardRow,
+  OpeningRoundView,
+  PerformanceReport,
+  RoundRecord,
+  UiPhase,
+} from "@/engine";
+import { calculateReport } from "@/engine";
+import { api } from "@/services/api";
+import { getOpeningPreview } from "@/services/mockAdapter";
+
+interface AttemptState {
+  phase: UiPhase;
+  attempt: Attempt | null;
+  opening: OpeningRoundView | null;
+  lastRecord: RoundRecord | null;
+  orderInput: number;
+  leaderboard: LeaderboardRow[];
+  globalBoard: LeaderboardRow[];
+  report: PerformanceReport | null;
+  heatRank: number | null;
+  globalRank: number | null;
+  heatWinnerCost: number | null;
+  error: string | null;
+  submitting: boolean;
+  skipAnimation: boolean;
+
+  startSolo: (playerName: string) => Promise<string>;
+  joinHeat: (heatIdOrCode: string, playerName: string) => Promise<string>;
+  hydrate: (attemptId: string) => Promise<void>;
+  setOrderInput: (n: number) => void;
+  confirmOrder: () => Promise<void>;
+  /** After merged animation+summary screen → next decide or final report. */
+  finishRoundSummary: () => void;
+  setSkipAnimation: (v: boolean) => void;
+  refreshLeaderboards: () => Promise<void>;
+  loadReport: () => Promise<void>;
+  /** Start a fresh attempt in the same heat (play again). Returns new attempt id. */
+  playAgain: () => Promise<string>;
+  reset: () => void;
+}
+
+const initial = {
+  phase: "intro" as UiPhase,
+  attempt: null as Attempt | null,
+  opening: null as OpeningRoundView | null,
+  lastRecord: null as RoundRecord | null,
+  orderInput: 4,
+  leaderboard: [] as LeaderboardRow[],
+  globalBoard: [] as LeaderboardRow[],
+  report: null as PerformanceReport | null,
+  heatRank: null as number | null,
+  globalRank: null as number | null,
+  heatWinnerCost: null as number | null,
+  error: null as string | null,
+  submitting: false,
+  skipAnimation: false,
+};
+
+function syncOpening(attempt: Attempt): OpeningRoundView | null {
+  if (attempt.status === "completed") return null;
+  return getOpeningPreview(attempt);
+}
+
+export const useAttemptStore = create<AttemptState>((set, get) => ({
+  ...initial,
+
+  async startSolo(playerName: string) {
+    set({ error: null, submitting: true });
+    try {
+      const heat = await api.createHeat({ solo: true, player_name: playerName });
+      const attempt = await api.createAttempt(heat.heat_id, {
+        player_name: playerName,
+      });
+      const opening = syncOpening(attempt);
+      set({
+        attempt,
+        opening,
+        phase: "decide",
+        orderInput: opening?.customerDemand ?? 4,
+        submitting: false,
+      });
+      await get().refreshLeaderboards();
+      return attempt.attempt_id;
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : "Failed to start", submitting: false });
+      throw e;
+    }
+  },
+
+  async joinHeat(heatIdOrCode: string, playerName: string) {
+    set({ error: null, submitting: true });
+    try {
+      const attempt = await api.createAttempt(heatIdOrCode, {
+        player_name: playerName,
+      });
+      const opening = syncOpening(attempt);
+      set({
+        attempt,
+        opening,
+        phase: "decide",
+        orderInput: opening?.customerDemand ?? 4,
+        submitting: false,
+      });
+      await get().refreshLeaderboards();
+      return attempt.attempt_id;
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : "Failed to join", submitting: false });
+      throw e;
+    }
+  },
+
+  async hydrate(attemptId: string) {
+    set({ error: null });
+    try {
+      const attempt = await api.getAttempt(attemptId);
+      if (!attempt) {
+        set({ error: "Attempt not found", phase: "intro" });
+        return;
+      }
+      if (attempt.status === "completed") {
+        const report = calculateReport(attempt.rounds);
+        set({
+          attempt,
+          opening: null,
+          phase: "report",
+          report,
+          lastRecord: attempt.rounds[attempt.rounds.length - 1] ?? null,
+        });
+        await get().loadReport();
+        return;
+      }
+      const opening = syncOpening(attempt);
+      set({
+        attempt,
+        opening,
+        phase: "decide",
+        orderInput: opening?.customerDemand ?? 4,
+      });
+      await get().refreshLeaderboards();
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : "Failed to load" });
+    }
+  },
+
+  setOrderInput(n: number) {
+    const max = get().attempt?.configuration.maximum_order ?? 100;
+    const min = get().attempt?.configuration.minimum_order ?? 0;
+    set({ orderInput: Math.min(max, Math.max(min, Math.floor(n) || 0)) });
+  },
+
+  async confirmOrder() {
+    const { attempt, orderInput } = get();
+    if (!attempt || attempt.status === "completed" || get().submitting) return;
+    set({ submitting: true, error: null });
+    try {
+      const res = await api.submitRound(attempt.attempt_id, {
+        round: attempt.current_round,
+        placed_order: orderInput,
+      });
+      const next = res.attempt;
+
+      set({
+        attempt: next,
+        lastRecord: res.round_record,
+        leaderboard: res.live_heat_board,
+        submitting: false,
+        // Single post-submit screen: vehicle rail + summary KPIs together
+        phase: "animating",
+      });
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : "Submit failed", submitting: false });
+    }
+  },
+
+  finishRoundSummary() {
+    const { attempt } = get();
+    if (!attempt) return;
+    if (attempt.status === "completed") {
+      const report = calculateReport(attempt.rounds);
+      set({ phase: "report", report, opening: null });
+      void get().loadReport();
+      return;
+    }
+    const opening = syncOpening(attempt);
+    set({
+      phase: "decide",
+      opening,
+      orderInput: opening?.customerDemand ?? get().orderInput,
+    });
+    void get().refreshLeaderboards();
+  },
+
+  setSkipAnimation(v: boolean) {
+    set({ skipAnimation: v });
+  },
+
+  async refreshLeaderboards() {
+    const { attempt } = get();
+    if (!attempt) return;
+    try {
+      const [live, global] = await Promise.all([
+        api.getHeatLeaderboard(attempt.heat_id, "live"),
+        api.getGlobalLeaderboard(attempt.configuration.configuration_id),
+      ]);
+      set({ leaderboard: live, globalBoard: global });
+    } catch {
+      /* ignore poll errors */
+    }
+  },
+
+  async loadReport() {
+    const { attempt } = get();
+    if (!attempt) return;
+    try {
+      const res = await api.completeAttempt(attempt.attempt_id);
+      const finished = res.live_heat_board.filter((r) => r.status === "completed");
+      const winnerCost =
+        finished.length > 0
+          ? Math.min(...finished.map((r) => r.cumulative_cost))
+          : res.report.final_cumulative_cost;
+      set({
+        report: res.report,
+        heatRank: res.heat_rank,
+        globalRank: res.global_rank,
+        heatWinnerCost: winnerCost,
+        leaderboard: res.live_heat_board,
+      });
+    } catch {
+      set({ report: calculateReport(attempt.rounds) });
+    }
+  },
+
+  async playAgain() {
+    const { attempt } = get();
+    if (!attempt) throw new Error("No attempt to restart");
+    const playerName = attempt.player_name;
+    const heatId = attempt.heat_id;
+    set({ error: null, submitting: true });
+    try {
+      const next = await api.createAttempt(heatId, { player_name: playerName });
+      const opening = syncOpening(next);
+      set({
+        attempt: next,
+        opening,
+        phase: "decide",
+        lastRecord: null,
+        orderInput: opening?.customerDemand ?? 4,
+        report: null,
+        heatRank: null,
+        globalRank: null,
+        heatWinnerCost: null,
+        submitting: false,
+        error: null,
+      });
+      await get().refreshLeaderboards();
+      return next.attempt_id;
+    } catch (e) {
+      // Heat may be full — create a new solo heat instead
+      try {
+        const heat = await api.createHeat({ solo: true, player_name: playerName });
+        const next = await api.createAttempt(heat.heat_id, {
+          player_name: playerName,
+        });
+        const opening = syncOpening(next);
+        set({
+          attempt: next,
+          opening,
+          phase: "decide",
+          lastRecord: null,
+          orderInput: opening?.customerDemand ?? 4,
+          report: null,
+          heatRank: null,
+          globalRank: null,
+          heatWinnerCost: null,
+          submitting: false,
+          error: null,
+        });
+        await get().refreshLeaderboards();
+        return next.attempt_id;
+      } catch (e2) {
+        set({
+          error: e2 instanceof Error ? e2.message : "Could not restart",
+          submitting: false,
+        });
+        throw e2;
+      }
+    }
+  },
+
+  reset() {
+    set({ ...initial });
+  },
+}));
