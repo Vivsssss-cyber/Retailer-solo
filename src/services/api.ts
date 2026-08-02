@@ -1,5 +1,6 @@
 import type { GameConfig } from "@/engine";
 import { ADMIN_PIN } from "@/lib/adminConfigStore";
+import { isHeatId, normalizeHeatKey } from "@/lib/heatKey";
 import type { RetailerChallengeApi } from "./types";
 import { mockAdapter } from "./mockAdapter";
 import { ApiRequestError } from "./apiErrors";
@@ -40,6 +41,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** Route create-attempt: heat_ ids vs access codes (by-code path). */
+function attemptPath(heatIdOrCode: string): string {
+  const key = normalizeHeatKey(heatIdOrCode);
+  if (isHeatId(key)) {
+    return `/heats/${encodeURIComponent(key)}/attempts`;
+  }
+  // Access codes: dedicated by-code route (avoids ambiguous dynamic segments)
+  return `/heats/by-code/${encodeURIComponent(key)}/attempts`;
+}
+
+/** Leaderboard / get-heat: [heatId] route also accepts access codes server-side. */
+function heatPath(heatIdOrCode: string, suffix: string): string {
+  const key = normalizeHeatKey(heatIdOrCode);
+  return `/heats/${encodeURIComponent(key)}${suffix}`;
+}
+
 const liveApi: RetailerChallengeApi = {
   getConfiguration: (id = "default") => request(`/configurations/${id}`),
   putConfiguration: (config: GameConfig) =>
@@ -53,7 +70,7 @@ const liveApi: RetailerChallengeApi = {
   createHeat: (body) =>
     request(`/heats`, { method: "POST", body: JSON.stringify(body) }),
   createAttempt: (heatId, body) =>
-    request(`/heats/${encodeURIComponent(heatId)}/attempts`, {
+    request(attemptPath(heatId), {
       method: "POST",
       body: JSON.stringify(body),
     }),
@@ -75,9 +92,7 @@ const liveApi: RetailerChallengeApi = {
       method: "POST",
     }),
   getHeatLeaderboard: (heatId, mode) =>
-    request(
-      `/heats/${encodeURIComponent(heatId)}/leaderboard?mode=${mode}`,
-    ),
+    request(`${heatPath(heatId, "/leaderboard")}?mode=${mode}`),
   getGlobalLeaderboard: (configurationId) =>
     request(
       `/events/default/global-leaderboard?configuration_id=${encodeURIComponent(configurationId)}`,

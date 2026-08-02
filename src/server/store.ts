@@ -90,11 +90,17 @@ function writeToDisk(store: DataStore): void {
   renameSync(tmp, file);
 }
 
-/** Load store (memory-cached). */
+/**
+ * Load store. In production/dev file mode, re-read disk on each access so
+ * Next.js HMR / multi-request paths always see the latest heats.
+ * Tests keep a single in-memory instance.
+ */
 export function loadStore(): DataStore {
-  if (!memory) {
-    memory = memoryOnly() ? seedStore() : readFromDisk();
+  if (memoryOnly()) {
+    if (!memory) memory = seedStore();
+    return memory;
   }
+  memory = readFromDisk();
   return memory;
 }
 

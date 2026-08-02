@@ -30,7 +30,10 @@ function friendlyMessage(code: string | undefined, fallback: string): string {
     case "ALREADY_ATTEMPTED":
       return "You already used your official attempt for this heat. Use Solo practice, or join with a different identity.";
     case "HEAT_NOT_FOUND":
-      return "Heat not found. Check the access code and try again.";
+      return (
+        fallback ||
+        "Heat not found. Check the code (no typos). Mock mode only works in the same browser — use NEXT_PUBLIC_USE_MOCK=false for real multiplayer."
+      );
     case "ATTEMPT_NOT_FOUND":
       return "That game session was not found. Start a new one from the home screen.";
     case "ATTEMPT_COMPLETED":

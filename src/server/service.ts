@@ -21,6 +21,7 @@ import {
   sortFinal,
   toLeaderboardRow,
 } from "./leaderboard";
+import { codeIndexKey, normalizeHeatKey } from "@/lib/heatKey";
 import { DEFAULT_EVENT_ID, updateStore, withStore } from "./store";
 import type { HeatRecord, ServerAttempt } from "./types";
 
@@ -49,9 +50,15 @@ function resolveHeatId(store: {
   heats: Record<string, HeatRecord>;
   codes: Record<string, string>;
 }, heatIdOrCode: string): HeatRecord | null {
-  if (store.heats[heatIdOrCode]) return store.heats[heatIdOrCode]!;
-  const upper = heatIdOrCode.toUpperCase();
-  const byCode = store.codes[upper] ?? store.codes[heatIdOrCode];
+  const key = normalizeHeatKey(heatIdOrCode);
+  if (!key) return null;
+  if (store.heats[key]) return store.heats[key]!;
+  // raw id (in case heat_ casing differed only in prefix handling)
+  if (store.heats[heatIdOrCode.trim()]) return store.heats[heatIdOrCode.trim()]!;
+  const byCode =
+    store.codes[key] ??
+    store.codes[codeIndexKey(heatIdOrCode)] ??
+    store.codes[heatIdOrCode.trim()];
   if (byCode && store.heats[byCode]) return store.heats[byCode]!;
   return null;
 }
@@ -69,7 +76,7 @@ function uniqueAccessCode(codes: Record<string, string>, solo: boolean): string 
   for (let i = 0; i < 20; i++) {
     const raw = makeAccessCode();
     const code = solo ? `SOLO-${raw}` : raw;
-    if (!codes[code.toUpperCase()]) return code;
+    if (!codes[codeIndexKey(code)]) return code;
   }
   // Extremely unlikely fallback
   return `X${Date.now().toString(36).toUpperCase()}`;
@@ -222,7 +229,7 @@ export async function createHeat(body: CreateHeatBody): Promise<CreateHeatResult
     if (solo) heat.max_players = 1;
 
     store.heats[heat_id] = heat;
-    store.codes[access_code.toUpperCase()] = heat_id;
+    store.codes[codeIndexKey(access_code)] = heat_id;
 
     return {
       heat_id,

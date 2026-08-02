@@ -25,6 +25,7 @@ import type {
   SubmitRoundRequest,
   SubmitRoundResponse,
 } from "./types";
+import { codeIndexKey, normalizeHeatKey } from "@/lib/heatKey";
 import { errorWithCode } from "./apiErrors";
 
 /** Mock-only fields for official one-attempt enforcement. */
@@ -228,20 +229,30 @@ export const mockAdapter: RetailerChallengeApi = {
       attempt_ids: [],
       created_at: new Date().toISOString(),
     };
-    store.codes[access_code] = heat_id;
+    store.codes[codeIndexKey(access_code)] = heat_id;
     save(store);
     return { heat_id, access_code, configuration };
   },
 
   async createAttempt(heatId: string, body: CreateAttemptRequest): Promise<Attempt> {
     const store = load();
-    let heat = store.heats[heatId];
+    const key = normalizeHeatKey(heatId);
+    let heat = store.heats[key] ?? store.heats[heatId.trim()];
     if (!heat) {
-      // allow join by access code
-      const byCode = store.codes[heatId] ?? store.codes[heatId.toUpperCase()];
+      // allow join by access code (case/space insensitive)
+      const byCode =
+        store.codes[key] ??
+        store.codes[codeIndexKey(heatId)] ??
+        store.codes[heatId.trim()] ??
+        store.codes[heatId.trim().toUpperCase()];
       if (byCode) heat = store.heats[byCode];
     }
-    if (!heat) throw errorWithCode("HEAT_NOT_FOUND", "Heat not found");
+    if (!heat) {
+      throw errorWithCode(
+        "HEAT_NOT_FOUND",
+        "Heat not found. In mock mode, the code only works in this same browser. For multiplayer across devices, set NEXT_PUBLIC_USE_MOCK=false.",
+      );
+    }
 
     const config = heat.configuration;
     const active = heat.attempt_ids

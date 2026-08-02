@@ -21,6 +21,7 @@ import { useAttemptStore } from "@/store/useAttemptStore";
 import { DEFAULT_CONFIG, type GameConfig } from "@/engine";
 import { loadAdminConfig } from "@/lib/adminConfigStore";
 import { api, USE_MOCK } from "@/services/api";
+// USE_MOCK shown on host screen — multiplayer needs live API across devices
 import {
   PERSONA_AVATAR_PLACEHOLDER,
   PERSONAS,
@@ -611,11 +612,34 @@ function HostShareScreen({
           fontFamily: FO,
           fontSize: 14,
           color: "var(--sv-text-secondary)",
-          marginBottom: 24,
+          marginBottom: 16,
         }}
       >
         Share this with your group. Up to 4 players can join, including you.
       </p>
+
+      {USE_MOCK && (
+        <p
+          style={{
+            fontFamily: FO,
+            fontSize: 12,
+            fontWeight: 600,
+            color: "var(--sv-warning, #b45309)",
+            background: "rgba(245, 158, 11, 0.12)",
+            border: "1px solid rgba(245, 158, 11, 0.35)",
+            borderRadius: 10,
+            padding: "10px 12px",
+            marginBottom: 16,
+            textAlign: "left",
+            lineHeight: 1.4,
+          }}
+        >
+          Mock mode: this code only works in <strong>this browser</strong>. For
+          classmates on other devices, set{" "}
+          <code style={{ fontSize: 11 }}>NEXT_PUBLIC_USE_MOCK=false</code> in{" "}
+          <code style={{ fontSize: 11 }}>.env.local</code> and restart the app.
+        </p>
+      )}
 
       {creating && !accessCode && (
         <div className="flex justify-center mb-6">

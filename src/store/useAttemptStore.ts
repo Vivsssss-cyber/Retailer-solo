@@ -10,6 +10,7 @@ import type {
   UiPhase,
 } from "@/engine";
 import { calculateReport } from "@/engine";
+import { isHeatId, normalizeHeatKey } from "@/lib/heatKey";
 import { api } from "@/services/api";
 import { parseApiFailure } from "@/services/apiErrors";
 import { getOpeningPreview } from "@/services/mockAdapter";
@@ -167,12 +168,16 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
   ) {
     set({ error: null, submitting: true });
     try {
+      const key = normalizeHeatKey(heatIdOrCode);
+      if (!key) {
+        const err = new Error("Enter a heat code first.");
+        set({ error: err.message, submitting: false });
+        throw err;
+      }
       // If joining by short code (not heat_ id), remember it for the header.
-      const looksLikeCode = !heatIdOrCode.startsWith("heat_");
-      if (looksLikeCode) {
-        const code = heatIdOrCode.trim().toUpperCase();
-        persistHeatCode(code);
-        set({ heatAccessCode: code });
+      if (!isHeatId(key)) {
+        persistHeatCode(key);
+        set({ heatAccessCode: key });
       }
       const isOfficial = options?.is_official === true;
       const identity = options?.player_identity?.trim() || undefined;
@@ -183,7 +188,7 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
         set({ error: err.message, submitting: false });
         throw err;
       }
-      const attempt = await api.createAttempt(heatIdOrCode, {
+      const attempt = await api.createAttempt(key, {
         player_name: playerName,
         is_official: isOfficial || undefined,
         player_identity: isOfficial ? identity : undefined,
