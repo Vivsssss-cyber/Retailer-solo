@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
 import {
   AlertCircle,
   BarChart3,
@@ -38,10 +37,12 @@ export interface StatItem {
 interface BoxViewProps {
   data: StatItem[];
   gridCols?: number;
+  /** Tighter cards for single-viewport play layout. */
+  dense?: boolean;
 }
 
 /** KPI cards ported from classic Beer Game BoxView (/demo/beer-game). */
-export default function BoxView({ data, gridCols = 2 }: BoxViewProps) {
+export default function BoxView({ data, gridCols = 2, dense = false }: BoxViewProps) {
   if (!data) return null;
 
   const getGridClass = () => {
@@ -58,17 +59,17 @@ export default function BoxView({ data, gridCols = 2 }: BoxViewProps) {
   };
 
   return (
-    <Stagger className={`grid gap-3 ${getGridClass()}`} delay={0.05}>
+    <Stagger className={`grid ${dense ? "gap-1.5" : "gap-3"} ${getGridClass()}`} delay={0.05}>
       {data.map((stat) => (
         <StaggerItem key={stat.id} className="h-full">
-          <StatCard stat={stat} />
+          <StatCard stat={stat} dense={dense} />
         </StaggerItem>
       ))}
     </Stagger>
   );
 }
 
-function StatCard({ stat }: { stat: StatItem }) {
+function StatCard({ stat, dense = false }: { stat: StatItem; dense?: boolean }) {
   const getIcon = (iconName: string) => {
     switch (iconName) {
       case "pie-chart":
@@ -110,18 +111,18 @@ function StatCard({ stat }: { stat: StatItem }) {
       style={{
         background: "var(--sv-card)",
         border: "1.4px solid white",
-        borderRadius: "var(--sv-radius-2xl)",
-        padding: 16,
-        minHeight: 96,
+        borderRadius: dense ? 12 : "var(--sv-radius-2xl)",
+        padding: dense ? 10 : 16,
+        minHeight: dense ? 72 : 96,
         height: "100%",
       }}
-      className="flex justify-between items-start gap-3"
+      className={`flex justify-between items-start ${dense ? "gap-2" : "gap-3"}`}
     >
-      <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+      <div className={`flex flex-col ${dense ? "gap-0.5" : "gap-1.5"} min-w-0 flex-1`}>
         <span
           style={{
             fontFamily: FO,
-            fontSize: 11,
+            fontSize: dense ? 10 : 11,
             fontWeight: 600,
             color: "var(--sv-text-secondary)",
           }}
@@ -162,7 +163,7 @@ function StatCard({ stat }: { stat: StatItem }) {
               className="sv-tabular"
               style={{
                 fontFamily: FO,
-                fontSize: 22,
+                fontSize: dense ? 18 : 22,
                 fontWeight: 700,
                 color: stat.color || "var(--sv-ink)",
                 lineHeight: 1,
@@ -174,7 +175,7 @@ function StatCard({ stat }: { stat: StatItem }) {
               <span
                 style={{
                   fontFamily: FO,
-                  fontSize: 12,
+                  fontSize: dense ? 11 : 12,
                   fontWeight: 500,
                   color: "var(--sv-text-muted)",
                 }}
@@ -186,11 +187,13 @@ function StatCard({ stat }: { stat: StatItem }) {
         )}
         {stat.subtext && (
           <p
+            className={dense ? "hidden sm:block" : undefined}
             style={{
               fontFamily: FO,
-              fontSize: 11,
+              fontSize: dense ? 10 : 11,
               color: stat.subtextColor || "var(--sv-text-muted)",
               marginTop: 2,
+              lineHeight: 1.25,
             }}
           >
             {stat.subtext}
@@ -199,9 +202,9 @@ function StatCard({ stat }: { stat: StatItem }) {
       </div>
       <div
         style={{
-          width: 40,
-          height: 40,
-          borderRadius: 10,
+          width: dense ? 32 : 40,
+          height: dense ? 32 : 40,
+          borderRadius: dense ? 8 : 10,
           background:
             stat.icon === "alert" ? "rgba(198,82,82,0.12)" : "var(--sv-cyan-tint)",
           display: "flex",

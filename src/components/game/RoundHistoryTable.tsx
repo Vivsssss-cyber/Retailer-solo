@@ -6,14 +6,16 @@ import type { RoundRecord } from "@/engine";
 export function RoundHistoryTable({
   rounds,
   unit = "Round",
+  dense = false,
 }: {
   rounds: RoundRecord[];
   unit?: string;
+  dense?: boolean;
 }) {
   if (rounds.length === 0) {
     return (
-      <div style={{ ...cardStyle, padding: 12 }}>
-        <h3 style={{ fontFamily: FO, fontWeight: 700, fontSize: 13, color: "var(--sv-ink)" }}>
+      <div style={{ ...cardStyle, padding: dense ? 8 : 12, height: "100%" }}>
+        <h3 style={{ fontFamily: FO, fontWeight: 700, fontSize: dense ? 12 : 13, color: "var(--sv-ink)" }}>
           Game progress
         </h3>
         <p style={{ fontFamily: FO, fontSize: 12, color: "var(--sv-text-muted)", marginTop: 8 }}>
@@ -24,19 +26,27 @@ export function RoundHistoryTable({
   }
 
   return (
-    <div style={{ ...cardStyle, padding: 12 }}>
+    <div
+      style={{ ...cardStyle, padding: dense ? 8 : 12, height: "100%", minHeight: 0 }}
+      className="flex flex-col min-h-0"
+    >
       <h3
         style={{
           fontFamily: FO,
           fontWeight: 700,
-          fontSize: 13,
+          fontSize: dense ? 12 : 13,
           color: "var(--sv-ink)",
-          marginBottom: 10,
+          marginBottom: dense ? 6 : 10,
         }}
+        className="shrink-0"
       >
         Game progress
       </h3>
-      <div className="overflow-x-auto max-h-[220px] overflow-y-auto">
+      <div
+        className={`overflow-x-auto overflow-y-auto min-h-0 flex-1 ${
+          dense ? "max-h-[132px]" : "max-h-[220px]"
+        }`}
+      >
         <table className="w-full" style={{ fontFamily: FO, fontSize: 12, borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ color: "var(--sv-text-muted)", textAlign: "center" }}>

@@ -9,10 +9,12 @@ export function LiveLeaderboard({
   live,
   global,
   playerName,
+  dense = false,
 }: {
   live: LeaderboardRow[];
   global: LeaderboardRow[];
   playerName: string;
+  dense?: boolean;
 }) {
   const [tab, setTab] = useState<"live" | "global">("live");
   const allFinished =
@@ -41,36 +43,39 @@ export function LiveLeaderboard({
     <div
       style={{
         ...cardStyle,
-        padding: 12,
+        padding: dense ? 8 : 12,
         height: "100%",
-        minHeight: 240,
+        minHeight: dense ? 0 : 240,
         display: "flex",
         flexDirection: "column",
       }}
+      className="min-h-0"
     >
-      <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+      <div className={`flex items-center justify-between gap-2 ${dense ? "mb-1" : "mb-2"} flex-wrap shrink-0`}>
         <div className="flex items-center gap-1.5">
           <Trophy size={14} color="var(--sv-teal-mid)" />
-          <span style={{ fontFamily: FO, fontWeight: 700, fontSize: 13, color: "var(--sv-ink)" }}>
+          <span style={{ fontFamily: FO, fontWeight: 700, fontSize: dense ? 12 : 13, color: "var(--sv-ink)" }}>
             Leaderboard
           </span>
         </div>
         <TabBar
           tabs={[
-            { id: "live", label: allFinished ? "Final Heat" : "Live Heat" },
-            { id: "global", label: "Global Best" },
+            { id: "live", label: allFinished ? "Final" : "Live" },
+            { id: "global", label: "Global" },
           ]}
           activeTab={tab}
           onChange={(id) => setTab(id as "live" | "global")}
         />
       </div>
-      <p style={{ fontFamily: FO, fontSize: 10, color: "var(--sv-text-muted)", marginBottom: 8 }}>
-        {tab === "global"
-          ? "Completed attempts only · same configuration."
-          : allFinished
-            ? "Final heat — cost, then backlog-weeks, then volatility."
-            : "Live race — progress first, cost second."}
-      </p>
+      {!dense && (
+        <p style={{ fontFamily: FO, fontSize: 10, color: "var(--sv-text-muted)", marginBottom: 8 }}>
+          {tab === "global"
+            ? "Completed attempts only · same configuration."
+            : allFinished
+              ? "Final heat — cost, then backlog-weeks, then volatility."
+              : "Live race — progress first, cost second."}
+        </p>
+      )}
       <div className="flex-1 overflow-auto min-h-0">
         <table className="w-full" style={{ fontFamily: FO, fontSize: 12 }}>
           <thead>

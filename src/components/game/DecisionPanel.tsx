@@ -43,12 +43,12 @@ export function DecisionPanel({
     <div
       role="region"
       aria-label="Place order"
-      className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 w-[min(720px,calc(100vw-1.5rem))] pointer-events-none"
+      className="fixed bottom-3 left-1/2 z-50 -translate-x-1/2 w-[min(720px,calc(100vw-1.5rem))] pointer-events-none"
     >
       <div
-        className="sv-frost-dock pointer-events-auto flex flex-wrap items-center gap-2.5 sm:gap-3 rounded-sv-pill"
+        className="sv-frost-dock pointer-events-auto flex flex-wrap items-center gap-2 sm:gap-2.5 rounded-sv-pill"
         style={{
-          padding: "10px 10px 10px 16px",
+          padding: "8px 8px 8px 14px",
           borderRadius: 9999,
           border: "1.5px solid var(--sv-border)",
           backdropFilter: "blur(56px) saturate(1.55)",

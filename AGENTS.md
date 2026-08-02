@@ -132,7 +132,7 @@ Copy `.env.example` → `.env.local`:
 - ~~Create-heat + show access code UX~~ (done: Host a Heat mode + code share + header badge)  
 - ~~Live board polling during play~~ (done: 4s poll while status=playing)  
 - ~~Official one-attempt UX~~ (done: practice vs official + email lock + friendly errors)  
-- True single-screen no-scroll densify  
+- ~~True single-screen no-scroll densify~~ (done: 100dvh play shell + dense KPIs/charts)  
 
 ### Known backend gaps (B5–B6)
 

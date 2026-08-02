@@ -6,8 +6,15 @@ import GraphicalView from "@/components/game/GraphicalView";
 import type { RoundRecord } from "@/engine";
 
 /** Side panel chart matching /demo/beer-game Inventory | Cost tabs. */
-export function TrendPanel({ rounds }: { rounds: RoundRecord[] }) {
+export function TrendPanel({
+  rounds,
+  dense = false,
+}: {
+  rounds: RoundRecord[];
+  dense?: boolean;
+}) {
   const [tab, setTab] = useState<"flow" | "cost">("flow");
+  const chartHeight = dense ? 148 : 240;
 
   const chartData = useMemo(() => {
     if (rounds.length === 0) {
@@ -32,7 +39,7 @@ export function TrendPanel({ rounds }: { rounds: RoundRecord[] }) {
         xAxis: "Rounds",
         yAxis: ["Inventory", "Backlog", "Demand", "Orders", "Delivery"],
         chartData,
-        height: 240,
+        height: chartHeight,
       };
     }
     return {
@@ -41,18 +48,21 @@ export function TrendPanel({ rounds }: { rounds: RoundRecord[] }) {
       xAxis: "Rounds",
       yAxis: ["Total Cost"],
       chartData,
-      height: 240,
+      height: chartHeight,
     };
-  }, [tab, chartData]);
+  }, [tab, chartData, chartHeight]);
 
   return (
-    <div style={{ ...cardStyle, padding: 12 }}>
-      <div className="flex items-center justify-between gap-2 mb-2">
+    <div
+      style={{ ...cardStyle, padding: dense ? 8 : 12, height: "100%", minHeight: 0 }}
+      className="flex flex-col min-h-0"
+    >
+      <div className={`flex items-center justify-between gap-2 ${dense ? "mb-1" : "mb-2"} shrink-0`}>
         <span
           style={{
             fontFamily: FO,
             fontWeight: 700,
-            fontSize: 13,
+            fontSize: dense ? 12 : 13,
             color: "var(--sv-ink)",
           }}
         >
@@ -60,14 +70,16 @@ export function TrendPanel({ rounds }: { rounds: RoundRecord[] }) {
         </span>
         <TabBar
           tabs={[
-            { id: "flow", label: "Inventory & flow" },
-            { id: "cost", label: "Cost over time" },
+            { id: "flow", label: dense ? "Flow" : "Inventory & flow" },
+            { id: "cost", label: dense ? "Cost" : "Cost over time" },
           ]}
           activeTab={tab}
           onChange={(id) => setTab(id as "flow" | "cost")}
         />
       </div>
-      <GraphicalView data={graphical} />
+      <div className="min-h-0 flex-1">
+        <GraphicalView data={graphical} />
+      </div>
     </div>
   );
 }

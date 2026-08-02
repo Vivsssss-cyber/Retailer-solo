@@ -114,5 +114,5 @@ export function StatusStrip({
     },
   ];
 
-  return <BoxView data={data} gridCols={6} />;
+  return <BoxView data={data} gridCols={6} dense />;
 }

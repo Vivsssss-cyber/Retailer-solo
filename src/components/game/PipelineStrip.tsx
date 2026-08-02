@@ -119,14 +119,14 @@ export function PipelineStrip({
     : slots;
 
   return (
-    <div style={{ ...cardStyle, padding: compact ? 12 : 14, height: "100%" }}>
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <Truck size={16} color="var(--sv-teal-mid)" />
+    <div style={{ ...cardStyle, padding: compact ? 8 : 14, height: "100%", minHeight: 0 }}>
+      <div className={`flex items-center gap-2 ${compact ? "mb-2" : "mb-3"} flex-wrap`}>
+        <Truck size={compact ? 14 : 16} color="var(--sv-teal-mid)" />
         <span
           style={{
             fontFamily: FO,
             fontWeight: 700,
-            fontSize: 13,
+            fontSize: compact ? 12 : 13,
             color: "var(--sv-ink)",
           }}
         >

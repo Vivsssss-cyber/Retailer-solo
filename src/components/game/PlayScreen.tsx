@@ -121,69 +121,90 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
   return (
     <GridBackground>
       <PageTransition>
+        {/* Viewport-locked play shell: prefer one screen on laptop/desktop */}
         <main
-          className="max-w-[1288px] mx-auto px-4 py-3 flex flex-col gap-3"
+          className="max-w-[1288px] mx-auto px-3 sm:px-4 flex flex-col gap-2"
           style={{
-            minHeight: "100vh",
+            height: "100dvh",
+            maxHeight: "100dvh",
+            overflow: "hidden",
             color: "var(--sv-text)",
-            /* Clear fixed order dock so history / pipeline stay readable */
-            paddingBottom: isRoundFlow ? 24 : 108,
+            paddingTop: 10,
+            /* Clear fixed order dock */
+            paddingBottom: isRoundFlow ? 16 : 92,
           }}
         >
-          <GameHeader
-            attempt={attempt}
-            livePosition={pos}
-            heatAccessCode={heatAccessCode}
-            onHowToPlayClick={() => setShowRules(true)}
-          />
+          <div className="shrink-0">
+            <GameHeader
+              attempt={attempt}
+              livePosition={pos}
+              heatAccessCode={heatAccessCode}
+              onHowToPlayClick={() => setShowRules(true)}
+            />
+          </div>
 
           {error && (
-            <p style={{ fontFamily: FO, fontSize: 12, color: "var(--sv-negative)" }}>{error}</p>
+            <p
+              className="shrink-0"
+              style={{ fontFamily: FO, fontSize: 12, color: "var(--sv-negative)" }}
+            >
+              {error}
+            </p>
           )}
 
           {isRoundFlow && lastRecord ? (
-            <SupplyChainAnimation
-              record={lastRecord}
-              attempt={attempt}
-              leaderboard={leaderboard}
-              isFinalRound={isFinalRound}
-              onContinue={finishRoundSummary}
-            />
-          ) : (
-            <>
-              <StatusStrip
-                opening={opening}
-                lastRecord={null}
-                inventoryCost={config.inventory_cost_per_unit}
-                backlogCost={config.backlog_cost_per_unit}
-                cumulativeCost={attempt.cumulative_cost}
+            <div className="flex-1 min-h-0 overflow-auto">
+              <SupplyChainAnimation
+                record={lastRecord}
+                attempt={attempt}
+                leaderboard={leaderboard}
+                isFinalRound={isFinalRound}
+                onContinue={finishRoundSummary}
               />
-
-              <div className="grid grid-cols-1 xl:grid-cols-[1.5fr_1fr] gap-3">
-                <TrendPanel rounds={attempt.rounds} />
-                <LiveLeaderboard
-                  live={leaderboard}
-                  global={globalBoard}
-                  playerName={attempt.player_name}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-3">
-                <div className="flex flex-col gap-3 min-w-0">
-                  <RoundHistoryTable rounds={attempt.rounds} unit={unit} />
-                </div>
-
-                <PipelineStrip
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
+              <div className="shrink-0">
+                <StatusStrip
                   opening={opening}
-                  delay={config.delivery_delay}
-                  pipeline={attempt.pipeline}
-                  pendingOrder={orderInput}
-                  supplyRate={opening?.supplyRate}
-                  timelineUnit={unit}
-                  compact
+                  lastRecord={null}
+                  inventoryCost={config.inventory_cost_per_unit}
+                  backlogCost={config.backlog_cost_per_unit}
+                  cumulativeCost={attempt.cumulative_cost}
                 />
               </div>
-            </>
+
+              <div className="grid grid-cols-1 xl:grid-cols-[1.45fr_1fr] gap-2 flex-1 min-h-0">
+                <div className="min-h-0 h-full">
+                  <TrendPanel rounds={attempt.rounds} dense />
+                </div>
+                <div className="min-h-0 h-full">
+                  <LiveLeaderboard
+                    live={leaderboard}
+                    global={globalBoard}
+                    playerName={attempt.player_name}
+                    dense
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-2 shrink-0 max-h-[38%] min-h-0">
+                <div className="min-h-0 min-w-0 overflow-hidden">
+                  <RoundHistoryTable rounds={attempt.rounds} unit={unit} dense />
+                </div>
+                <div className="min-h-0 overflow-hidden">
+                  <PipelineStrip
+                    opening={opening}
+                    delay={config.delivery_delay}
+                    pipeline={attempt.pipeline}
+                    pendingOrder={orderInput}
+                    supplyRate={opening?.supplyRate}
+                    timelineUnit={unit}
+                    compact
+                  />
+                </div>
+              </div>
+            </div>
           )}
         </main>
 
