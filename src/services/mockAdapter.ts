@@ -25,6 +25,13 @@ import type {
   SubmitRoundRequest,
   SubmitRoundResponse,
 } from "./types";
+import { errorWithCode } from "./apiErrors";
+
+/** Mock-only fields for official one-attempt enforcement. */
+type MockAttempt = Attempt & {
+  is_official?: boolean;
+  player_identity?: string | null;
+};
 
 /** Active event config (admin overrides DEFAULT_CONFIG via localStorage). */
 function activeConfig(): GameConfig {
@@ -43,7 +50,7 @@ interface HeatRecord {
 
 interface StoreShape {
   heats: Record<string, HeatRecord>;
-  attempts: Record<string, Attempt>;
+  attempts: Record<string, MockAttempt>;
   codes: Record<string, string>; // access_code -> heat_id
   globalCompleted: string[]; // attempt ids
 }
@@ -74,6 +81,24 @@ function id(prefix: string) {
 
 function code() {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+function toPublicAttempt(a: MockAttempt): Attempt {
+  return {
+    attempt_id: a.attempt_id,
+    heat_id: a.heat_id,
+    player_name: a.player_name,
+    configuration: a.configuration,
+    status: a.status,
+    current_round: a.current_round,
+    pipeline: a.pipeline,
+    inventory: a.inventory,
+    backlog: a.backlog,
+    cumulative_cost: a.cumulative_cost,
+    rounds: a.rounds,
+    started_at: a.started_at,
+    completed_at: a.completed_at,
+  };
 }
 
 function toLeaderboardRow(attempt: Attempt, position: number): LeaderboardRow {
@@ -212,20 +237,40 @@ export const mockAdapter: RetailerChallengeApi = {
       const byCode = store.codes[heatId] ?? store.codes[heatId.toUpperCase()];
       if (byCode) heat = store.heats[byCode];
     }
-    if (!heat) throw new Error("Heat not found");
+    if (!heat) throw errorWithCode("HEAT_NOT_FOUND", "Heat not found");
 
     const config = heat.configuration;
     const active = heat.attempt_ids
       .map((aid) => store.attempts[aid])
-      .filter(Boolean);
-    if (active.length >= config.maximum_players_per_heat) {
-      throw new Error(
-        `Heat is full (max ${config.maximum_players_per_heat} players)`,
+      .filter((a): a is MockAttempt => !!a);
+
+    // Solo heats use max 1; multiplayer uses config max (host path creates non-SOLO codes).
+    const maxPlayers = heat.access_code.startsWith("SOLO-")
+      ? 1
+      : config.maximum_players_per_heat;
+    if (active.length >= maxPlayers) {
+      throw errorWithCode(
+        "HEAT_FULL",
+        `Heat is full (max ${maxPlayers} players)`,
       );
     }
 
+    const identity = body.player_identity?.trim() || null;
+    const isOfficial = body.is_official === true;
+    if (isOfficial && identity) {
+      const dup = active.find(
+        (a) => a.is_official && a.player_identity === identity,
+      );
+      if (dup) {
+        throw errorWithCode(
+          "ALREADY_ATTEMPTED",
+          "An official attempt already exists for this identity",
+        );
+      }
+    }
+
     const attempt_id = id("att");
-    const attempt: Attempt = {
+    const attempt: MockAttempt = {
       attempt_id,
       heat_id: heat.heat_id,
       player_name: body.player_name.trim() || "Player",
@@ -238,25 +283,37 @@ export const mockAdapter: RetailerChallengeApi = {
       cumulative_cost: 0,
       rounds: [],
       started_at: new Date().toISOString(),
+      is_official: isOfficial,
+      player_identity: identity,
     };
     store.attempts[attempt_id] = attempt;
     heat.attempt_ids.push(attempt_id);
     save(store);
-    return attempt;
+    return toPublicAttempt(attempt);
   },
 
   async getAttempt(attemptId: string) {
     const store = load();
-    return store.attempts[attemptId] ?? null;
+    const a = store.attempts[attemptId];
+    if (!a) return null;
+    return toPublicAttempt(a);
   },
 
   async submitRound(attemptId: string, body: SubmitRoundRequest): Promise<SubmitRoundResponse> {
     const store = load();
     const attempt = store.attempts[attemptId];
-    if (!attempt) throw new Error("Attempt not found");
-    if (attempt.status === "completed") throw new Error("Attempt completed");
+    if (!attempt) throw errorWithCode("ATTEMPT_NOT_FOUND", "Attempt not found");
+    if (attempt.status === "completed") {
+      throw errorWithCode("ATTEMPT_COMPLETED", "Attempt completed");
+    }
     if (body.round !== attempt.current_round) {
-      throw new Error(`Expected round ${attempt.current_round}, got ${body.round}`);
+      if (attempt.rounds.some((r) => r.round === body.round)) {
+        throw errorWithCode("ROUND_LOCKED", `Round ${body.round} already submitted`);
+      }
+      throw errorWithCode(
+        "ROUND_MISMATCH",
+        `Expected round ${attempt.current_round}, got ${body.round}`,
+      );
     }
 
     const { attempt: next, record } = processOrder(attempt, body.placed_order);

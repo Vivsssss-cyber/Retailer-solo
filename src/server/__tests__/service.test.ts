@@ -82,6 +82,21 @@ describe("heat + attempt lifecycle", () => {
       }),
     ).rejects.toMatchObject({ code: "ALREADY_ATTEMPTED" });
   });
+
+  it("allows practice retries without identity lock", async () => {
+    const heat = await createHeat({ solo: false });
+    await createAttempt(heat.heat_id, {
+      player_name: "Ava",
+      is_official: false,
+      player_identity: "ava@example.com",
+    });
+    const second = await createAttempt(heat.heat_id, {
+      player_name: "Ava 2",
+      is_official: false,
+      player_identity: "ava@example.com",
+    });
+    expect(second.player_name).toBe("Ava 2");
+  });
 });
 
 describe("submitRound", () => {

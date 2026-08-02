@@ -1,5 +1,6 @@
 import type { RetailerChallengeApi } from "./types";
 import { mockAdapter } from "./mockAdapter";
+import { ApiRequestError } from "./apiErrors";
 
 /**
  * Live REST client — used when NEXT_PUBLIC_USE_MOCK is "false".
@@ -8,18 +9,6 @@ import { mockAdapter } from "./mockAdapter";
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== "false";
 
 const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
-
-class ApiRequestError extends Error {
-  readonly status: number;
-  readonly code?: string;
-
-  constructor(message: string, status: number, code?: string) {
-    super(message);
-    this.name = "ApiRequestError";
-    this.status = status;
-    this.code = code;
-  }
-}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${base}/api/retailer-challenge${path}`, {
@@ -86,4 +75,5 @@ const liveApi: RetailerChallengeApi = {
 };
 
 export const api: RetailerChallengeApi = USE_MOCK ? mockAdapter : liveApi;
-export { USE_MOCK, ApiRequestError };
+export { USE_MOCK };
+export { ApiRequestError } from "./apiErrors";

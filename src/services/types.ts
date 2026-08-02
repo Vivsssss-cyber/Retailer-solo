@@ -20,6 +20,10 @@ export interface CreateHeatResponse {
 
 export interface CreateAttemptRequest {
   player_name: string;
+  /** Stable identity for one-official-attempt lock (email / device id). */
+  player_identity?: string;
+  /** When true, server rejects a second attempt with the same identity. */
+  is_official?: boolean;
 }
 
 export interface SubmitRoundRequest {

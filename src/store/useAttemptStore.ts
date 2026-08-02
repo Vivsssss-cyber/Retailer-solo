@@ -11,7 +11,13 @@ import type {
 } from "@/engine";
 import { calculateReport } from "@/engine";
 import { api } from "@/services/api";
+import { parseApiFailure } from "@/services/apiErrors";
 import { getOpeningPreview } from "@/services/mockAdapter";
+
+export interface JoinOptions {
+  player_identity?: string;
+  is_official?: boolean;
+}
 
 const HEAT_CODE_KEY = "retailer-challenge-heat-code";
 
@@ -61,7 +67,11 @@ interface AttemptState {
     heat_id: string;
     access_code: string;
   }>;
-  joinHeat: (heatIdOrCode: string, playerName: string) => Promise<string>;
+  joinHeat: (
+    heatIdOrCode: string,
+    playerName: string,
+    options?: JoinOptions,
+  ) => Promise<string>;
   hydrate: (attemptId: string) => Promise<void>;
   setOrderInput: (n: number) => void;
   confirmOrder: () => Promise<void>;
@@ -121,7 +131,8 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
       await get().refreshLeaderboards();
       return attempt.attempt_id;
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : "Failed to start", submitting: false });
+      const { message } = parseApiFailure(e);
+      set({ error: message, submitting: false });
       throw e;
     }
   },
@@ -140,15 +151,20 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
       });
       return { heat_id: heat.heat_id, access_code: heat.access_code };
     } catch (e) {
+      const { message } = parseApiFailure(e);
       set({
-        error: e instanceof Error ? e.message : "Failed to create heat",
+        error: message,
         submitting: false,
       });
       throw e;
     }
   },
 
-  async joinHeat(heatIdOrCode: string, playerName: string) {
+  async joinHeat(
+    heatIdOrCode: string,
+    playerName: string,
+    options?: JoinOptions,
+  ) {
     set({ error: null, submitting: true });
     try {
       // If joining by short code (not heat_ id), remember it for the header.
@@ -158,8 +174,19 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
         persistHeatCode(code);
         set({ heatAccessCode: code });
       }
+      const isOfficial = options?.is_official === true;
+      const identity = options?.player_identity?.trim() || undefined;
+      if (isOfficial && !identity) {
+        const err = new Error(
+          "Official attempts need an email or ID so we can lock one attempt per person.",
+        );
+        set({ error: err.message, submitting: false });
+        throw err;
+      }
       const attempt = await api.createAttempt(heatIdOrCode, {
         player_name: playerName,
+        is_official: isOfficial || undefined,
+        player_identity: isOfficial ? identity : undefined,
       });
       const opening = syncOpening(attempt);
       set({
@@ -173,7 +200,8 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
       await get().refreshLeaderboards();
       return attempt.attempt_id;
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : "Failed to join", submitting: false });
+      const { message } = parseApiFailure(e);
+      set({ error: message, submitting: false });
       throw e;
     }
   },
@@ -209,7 +237,8 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
       });
       await get().refreshLeaderboards();
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : "Failed to load" });
+      const { message } = parseApiFailure(e);
+      set({ error: message });
     }
   },
 
@@ -239,7 +268,8 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
         phase: "animating",
       });
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : "Submit failed", submitting: false });
+      const { message } = parseApiFailure(e);
+      set({ error: message, submitting: false });
     }
   },
 
@@ -349,8 +379,9 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
         await get().refreshLeaderboards();
         return next.attempt_id;
       } catch (e2) {
+        const { message } = parseApiFailure(e2);
         set({
-          error: e2 instanceof Error ? e2.message : "Could not restart",
+          error: message,
           submitting: false,
         });
         throw e2;

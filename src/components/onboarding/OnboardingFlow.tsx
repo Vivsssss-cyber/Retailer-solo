@@ -39,10 +39,33 @@ const COACH_LINES: Record<string, string> = {
   mode: "Solo to practice, host a heat for your class, or join with a code.",
   heatCode: "Ask your host for the code. Then we can join the heat.",
   hostShare: "Share this code with your group. They join from the home screen.",
+  official:
+    "Official locks one attempt per email for the event board. Practice stays unlimited.",
   loading: "Locking in your setup. Warehouse opens in a second…",
 };
 
 type PlayMode = "solo" | "host" | "heat";
+
+const IDENTITY_KEY = "retailer-challenge-player-identity";
+
+function readSavedIdentity(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return sessionStorage.getItem(IDENTITY_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function saveIdentity(value: string) {
+  if (typeof window === "undefined") return;
+  try {
+    if (value) sessionStorage.setItem(IDENTITY_KEY, value);
+    else sessionStorage.removeItem(IDENTITY_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 // ---------------------------------------------------------
 // Helpers
@@ -686,12 +709,145 @@ function HostShareScreen({
   );
 }
 
+function OfficialScreen({
+  isOfficial,
+  identity,
+  onOfficialChange,
+  onIdentityChange,
+  onNext,
+  onBack,
+}: {
+  isOfficial: boolean;
+  identity: string;
+  onOfficialChange: (v: boolean) => void;
+  onIdentityChange: (v: string) => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const canContinue = !isOfficial || identity.trim().includes("@");
+
+  return (
+    <GlassCard className="p-4">
+      <h2
+        style={{
+          fontFamily: FO,
+          fontWeight: 700,
+          fontSize: 24,
+          color: "var(--sv-ink)",
+          marginBottom: 8,
+        }}
+      >
+        Official or practice?
+      </h2>
+      <p
+        style={{
+          fontFamily: FO,
+          fontSize: 14,
+          color: "var(--sv-text-secondary)",
+          marginBottom: 20,
+        }}
+      >
+        Official attempts count once per person for the event. Practice does not lock you out.
+      </p>
+
+      <div className="flex flex-col gap-3 mb-6">
+        <SelectionCard active={!isOfficial} onClick={() => onOfficialChange(false)}>
+          <div className="text-left">
+            <div style={{ fontFamily: FO, fontWeight: 600, fontSize: 15 }}>Practice</div>
+            <div style={{ fontFamily: FO, fontSize: 12, color: "var(--sv-text-muted)", marginTop: 2 }}>
+              Unlimited retries. Not ranked as official.
+            </div>
+          </div>
+        </SelectionCard>
+        <SelectionCard active={isOfficial} onClick={() => onOfficialChange(true)}>
+          <div className="text-left">
+            <div style={{ fontFamily: FO, fontWeight: 600, fontSize: 15 }}>Official attempt</div>
+            <div style={{ fontFamily: FO, fontSize: 12, color: "var(--sv-text-muted)", marginTop: 2 }}>
+              One per email for this heat. Choose carefully.
+            </div>
+          </div>
+        </SelectionCard>
+      </div>
+
+      {isOfficial && (
+        <>
+          <label
+            htmlFor="player-identity"
+            style={{
+              display: "block",
+              fontFamily: FO,
+              fontSize: 10,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              color: "var(--sv-teal-mid)",
+              marginBottom: 8,
+            }}
+          >
+            Email (locks one attempt)
+          </label>
+          <input
+            id="player-identity"
+            type="email"
+            autoComplete="email"
+            value={identity}
+            onChange={(e) => onIdentityChange(e.target.value)}
+            placeholder="you@school.edu"
+            style={{
+              width: "100%",
+              fontFamily: FO,
+              fontSize: 16,
+              padding: "14px 16px",
+              borderRadius: 12,
+              border: "2px solid var(--sv-border)",
+              background: "rgba(255,255,255,0.8)",
+              color: "var(--sv-ink)",
+              marginBottom: 20,
+              outline: "none",
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && canContinue) onNext();
+            }}
+          />
+        </>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onBack}
+          style={{
+            padding: "16px",
+            borderRadius: 12,
+            border: "1.5px solid var(--sv-border)",
+            background: "rgba(255,255,255,0.5)",
+            fontFamily: FO,
+            fontWeight: 600,
+            fontSize: 15,
+            color: "var(--sv-text-secondary)",
+            cursor: "pointer",
+          }}
+        >
+          Back
+        </button>
+        <GameButton size="lg" style={{ flex: 1 }} disabled={!canContinue} onClick={onNext}>
+          Continue
+        </GameButton>
+      </div>
+    </GlassCard>
+  );
+}
+
 function LoadingScreen({
   onStart,
+  onRetry,
+  onHome,
   submitting,
   error,
 }: {
   onStart: () => void;
+  onRetry: () => void;
+  onHome: () => void;
   submitting: boolean;
   error: string | null;
 }) {
@@ -704,18 +860,37 @@ function LoadingScreen({
 
   return (
     <GlassCard className="text-center py-12 px-4">
-      <div className="flex justify-center mb-6">
-        <div className="w-10 h-10 border-4 border-t-[var(--sv-teal-mid)] border-b-[var(--sv-teal-mid)] border-l-transparent border-r-transparent rounded-full animate-spin" />
-      </div>
+      {!error && (
+        <div className="flex justify-center mb-6">
+          <div className="w-10 h-10 border-4 border-t-[var(--sv-teal-mid)] border-b-[var(--sv-teal-mid)] border-l-transparent border-r-transparent rounded-full animate-spin" />
+        </div>
+      )}
       <h2 style={{ fontFamily: FO, fontWeight: 700, fontSize: 20, color: "var(--sv-ink)", marginBottom: 8 }}>
-        {submitting ? "Preparing your supply chain..." : "Connecting..."}
+        {error
+          ? "Couldn’t start"
+          : submitting
+            ? "Preparing your supply chain..."
+            : "Connecting..."}
       </h2>
       {error && (
         <div className="mt-4">
-          <p style={{ fontFamily: FO, fontSize: 14, color: "var(--sv-negative)", marginBottom: 16 }}>
+          <p
+            style={{
+              fontFamily: FO,
+              fontSize: 14,
+              color: "var(--sv-negative)",
+              marginBottom: 16,
+              lineHeight: 1.45,
+            }}
+          >
             {error}
           </p>
-          <GameButton onClick={() => window.location.reload()}>Try Again</GameButton>
+          <div className="flex flex-col gap-2">
+            <GameButton onClick={onRetry}>Try again</GameButton>
+            <GameButton variant="ghost" onClick={onHome}>
+              Back to start
+            </GameButton>
+          </div>
         </div>
       )}
     </GlassCard>
@@ -750,15 +925,21 @@ export default function OnboardingFlow() {
     return () => window.clearTimeout(t);
   }, []);
 
-  const [data, setData] = useState({
+  const [data, setData] = useState(() => ({
     persona: "" as PersonaSlug | "",
     name: "",
     mode: "solo" as PlayMode,
     heatCode: "",
-  });
+    isOfficial: false,
+    playerIdentity: readSavedIdentity(),
+  }));
 
   const updateData = <K extends keyof typeof data>(key: K, val: (typeof data)[K]) => {
-    setData((prev) => ({ ...prev, [key]: val }));
+    setData((prev) => {
+      const next = { ...prev, [key]: val };
+      if (key === "mode" && val === "solo") next.isOfficial = false;
+      return next;
+    });
     // Persist immediately so the play header can show the chosen avatar.
     if (key === "persona" || key === "name") {
       const nextPersona = key === "persona" ? (val as PersonaSlug | "") : data.persona;
@@ -769,6 +950,9 @@ export default function OnboardingFlow() {
           name: nextName.trim() || null,
         });
       }
+    }
+    if (key === "playerIdentity") {
+      saveIdentity(String(val).trim());
     }
     // Changing mode drops any staged host heat so codes don't leak across modes.
     if (key === "mode") {
@@ -855,20 +1039,68 @@ export default function OnboardingFlow() {
           },
         ]
       : []),
+    ...(data.mode === "host" || data.mode === "heat"
+      ? [
+          {
+            id: "official",
+            component: (
+              <OfficialScreen
+                isOfficial={data.isOfficial}
+                identity={data.playerIdentity}
+                onOfficialChange={(v) => updateData("isOfficial", v)}
+                onIdentityChange={(v) => updateData("playerIdentity", v)}
+                onNext={next}
+                onBack={() => setStepIndex((s) => Math.max(0, s - 1))}
+              />
+            ),
+          },
+        ]
+      : []),
     {
       id: "loading",
       component: (
         <LoadingScreen
           submitting={submitting}
           error={error}
+          onHome={() => {
+            reset();
+            setStepIndex(0);
+          }}
+          onRetry={() => {
+            // Re-fire start by remounting loading via step nudge
+            void (async () => {
+              const player = data.name.trim() || "Player";
+              writePlayerProfile({ persona: data.persona || null, name: player });
+              try {
+                if (data.mode === "solo") {
+                  reset();
+                  const id = await startSolo(player);
+                  router.push(`/play/${id}`);
+                } else if (data.mode === "host") {
+                  if (!hostedHeat?.heat_id) throw new Error("Heat not ready");
+                  const id = await joinHeat(hostedHeat.heat_id, player, {
+                    is_official: data.isOfficial,
+                    player_identity: data.playerIdentity.trim(),
+                  });
+                  router.push(`/play/${id}`);
+                } else {
+                  const id = await joinHeat(data.heatCode.trim(), player, {
+                    is_official: data.isOfficial,
+                    player_identity: data.playerIdentity.trim(),
+                  });
+                  router.push(`/play/${id}`);
+                }
+              } catch (err) {
+                console.error(err);
+              }
+            })();
+          }}
           onStart={async () => {
             const player = data.name.trim() || "Player";
-            // Final write so play header always has the chosen avatar.
             writePlayerProfile({
               persona: data.persona || null,
               name: player,
             });
-            // Do not wipe heatAccessCode set by createHostedHeat / join.
             try {
               if (data.mode === "solo") {
                 reset();
@@ -878,10 +1110,16 @@ export default function OnboardingFlow() {
                 if (!hostedHeat?.heat_id) {
                   throw new Error("Heat not ready — go back and create a code");
                 }
-                const id = await joinHeat(hostedHeat.heat_id, player);
+                const id = await joinHeat(hostedHeat.heat_id, player, {
+                  is_official: data.isOfficial,
+                  player_identity: data.playerIdentity.trim(),
+                });
                 router.push(`/play/${id}`);
               } else {
-                const id = await joinHeat(data.heatCode.trim(), player);
+                const id = await joinHeat(data.heatCode.trim(), player, {
+                  is_official: data.isOfficial,
+                  player_identity: data.playerIdentity.trim(),
+                });
                 router.push(`/play/${id}`);
               }
             } catch (err) {
@@ -962,7 +1200,8 @@ export default function OnboardingFlow() {
             {safeIndex > 0 &&
               safeIndex < allScreens.length - 1 &&
               stepId !== "heatCode" &&
-              stepId !== "hostShare" && (
+              stepId !== "hostShare" &&
+              stepId !== "official" && (
                 <button
                   type="button"
                   onClick={() => setStepIndex((s) => Math.max(0, s - 1))}
