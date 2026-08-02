@@ -18,6 +18,7 @@ import {
   DollarSign,
 } from "@/components/cyan/PixelIcons";
 import { useAttemptStore } from "@/store/useAttemptStore";
+// getState used in host start fallback for heatAccessCode
 import { DEFAULT_CONFIG, type GameConfig } from "@/engine";
 import { loadAdminConfig } from "@/lib/adminConfigStore";
 import { api, USE_MOCK } from "@/services/api";
@@ -577,7 +578,9 @@ function HostShareScreen({
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (!accessCode && !creating && !error) {
+    // Always try create when we don't have a code yet (don't gate on store error —
+    // a prior failed join would block hosting forever).
+    if (!accessCode && !creating) {
       onCreate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- create once on mount
@@ -870,17 +873,17 @@ function LoadingScreen({
   submitting,
   error,
 }: {
-  onStart: () => void;
-  onRetry: () => void;
+  onStart: () => void | Promise<void>;
+  onRetry: () => void | Promise<void>;
   onHome: () => void;
   submitting: boolean;
   error: string | null;
 }) {
+  // Always attempt start on mount. Do NOT gate on store `error` — a leftover
+  // "Heat not found" from a previous try would skip start forever.
   useEffect(() => {
-    if (!submitting && !error) {
-      onStart();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void onStart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once per visit to this step
   }, []);
 
   return (
@@ -911,7 +914,13 @@ function LoadingScreen({
             {error}
           </p>
           <div className="flex flex-col gap-2">
-            <GameButton onClick={onRetry}>Try again</GameButton>
+            <GameButton
+              onClick={() => {
+                void onRetry();
+              }}
+            >
+              Try again
+            </GameButton>
             <GameButton variant="ghost" onClick={onHome}>
               Back to start
             </GameButton>
@@ -1019,6 +1028,50 @@ export default function OnboardingFlow() {
     }
   };
 
+  /** Shared start logic for loading step + retry (always clears prior errors). */
+  const runStart = async () => {
+    const player = data.name.trim() || "Player";
+    writePlayerProfile({
+      persona: data.persona || null,
+      name: player,
+    });
+    try {
+      if (data.mode === "solo") {
+        const id = await startSolo(player);
+        router.push(`/play/${id}`);
+        return;
+      }
+      if (data.mode === "host") {
+        // Prefer access_code so join works even if heat_id was lost from React state
+        const key =
+          hostedHeat?.access_code ||
+          hostedHeat?.heat_id ||
+          useAttemptStore.getState().heatAccessCode;
+        if (!key) {
+          throw new Error("Heat not ready — go back and create a code");
+        }
+        const id = await joinHeat(key, player, {
+          is_official: data.isOfficial,
+          player_identity: data.playerIdentity.trim(),
+        });
+        router.push(`/play/${id}`);
+        return;
+      }
+      // Join by code
+      const code = data.heatCode.trim();
+      if (!code) {
+        throw new Error("Enter a heat code first.");
+      }
+      const id = await joinHeat(code, player, {
+        is_official: data.isOfficial,
+        player_identity: data.playerIdentity.trim(),
+      });
+      router.push(`/play/${id}`);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const allScreens = [
     { id: "welcome", component: <WelcomeScreen config={gameConfig} onNext={next} /> },
     {
@@ -1106,75 +1159,20 @@ export default function OnboardingFlow() {
           error={error}
           onHome={() => {
             reset();
+            setHostedHeat(null);
+            setHostError(null);
             setStepIndex(0);
           }}
-          onRetry={() => {
-            // Re-fire start by remounting loading via step nudge
-            void (async () => {
-              const player = data.name.trim() || "Player";
-              writePlayerProfile({ persona: data.persona || null, name: player });
-              try {
-                if (data.mode === "solo") {
-                  reset();
-                  const id = await startSolo(player);
-                  router.push(`/play/${id}`);
-                } else if (data.mode === "host") {
-                  if (!hostedHeat?.heat_id) throw new Error("Heat not ready");
-                  const id = await joinHeat(hostedHeat.heat_id, player, {
-                    is_official: data.isOfficial,
-                    player_identity: data.playerIdentity.trim(),
-                  });
-                  router.push(`/play/${id}`);
-                } else {
-                  const id = await joinHeat(data.heatCode.trim(), player, {
-                    is_official: data.isOfficial,
-                    player_identity: data.playerIdentity.trim(),
-                  });
-                  router.push(`/play/${id}`);
-                }
-              } catch (err) {
-                console.error(err);
-              }
-            })();
-          }}
-          onStart={async () => {
-            const player = data.name.trim() || "Player";
-            writePlayerProfile({
-              persona: data.persona || null,
-              name: player,
-            });
-            try {
-              if (data.mode === "solo") {
-                reset();
-                const id = await startSolo(player);
-                router.push(`/play/${id}`);
-              } else if (data.mode === "host") {
-                if (!hostedHeat?.heat_id) {
-                  throw new Error("Heat not ready — go back and create a code");
-                }
-                const id = await joinHeat(hostedHeat.heat_id, player, {
-                  is_official: data.isOfficial,
-                  player_identity: data.playerIdentity.trim(),
-                });
-                router.push(`/play/${id}`);
-              } else {
-                const id = await joinHeat(data.heatCode.trim(), player, {
-                  is_official: data.isOfficial,
-                  player_identity: data.playerIdentity.trim(),
-                });
-                router.push(`/play/${id}`);
-              }
-            } catch (err) {
-              console.error(err);
-            }
-          }}
+          onRetry={() => void runStart()}
+          onStart={() => void runStart()}
         />
       ),
     },
   ];
 
-  const safeIndex = Math.min(stepIndex, allScreens.length - 1);
-  const stepId = allScreens[safeIndex].id;
+  // Keep index valid when mode changes screen count (host/join/solo).
+  const safeIndex = Math.min(stepIndex, Math.max(0, allScreens.length - 1));
+  const stepId = allScreens[safeIndex]?.id ?? "welcome";
   const progress = ((safeIndex + 1) / allScreens.length) * 100;
   const CurrentScreen = allScreens[safeIndex].component;
 

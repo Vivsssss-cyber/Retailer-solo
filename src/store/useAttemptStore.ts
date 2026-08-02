@@ -117,7 +117,8 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
     try {
       const heat = await api.createHeat({ solo: true, player_name: playerName });
       persistHeatCode(heat.access_code);
-      const attempt = await api.createAttempt(heat.heat_id, {
+      // Prefer access code for attempt create — same path multiplayer join uses
+      const attempt = await api.createAttempt(heat.access_code || heat.heat_id, {
         player_name: playerName,
       });
       const opening = syncOpening(attempt);
