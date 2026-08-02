@@ -123,13 +123,13 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
       <PageTransition>
         {/* Viewport-locked play shell: prefer one screen on laptop/desktop */}
         <main
-          className="max-w-[1288px] mx-auto px-3 sm:px-4 flex flex-col gap-2"
+          className="max-w-[1288px] mx-auto px-4 sm:px-6 flex flex-col gap-4"
           style={{
             height: "100dvh",
             maxHeight: "100dvh",
             overflow: "hidden",
             color: "var(--sv-text)",
-            paddingTop: 10,
+            paddingTop: 16,
             /* Clear fixed order dock */
             paddingBottom: isRoundFlow ? 16 : 92,
           }}
@@ -163,7 +163,7 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
               />
             </div>
           ) : (
-            <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
+            <div className="flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
               <div className="shrink-0">
                 <StatusStrip
                   opening={opening}
@@ -174,7 +174,7 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
                 />
               </div>
 
-              <div className="grid grid-cols-1 xl:grid-cols-[1.45fr_1fr] gap-2 flex-1 min-h-0">
+              <div className="grid grid-cols-1 xl:grid-cols-[1.45fr_1fr] gap-4 flex-1 min-h-0">
                 <div className="min-h-0 h-full">
                   <TrendPanel rounds={attempt.rounds} dense />
                 </div>
@@ -188,16 +188,17 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-2 shrink-0 max-h-[38%] min-h-0">
-                <div className="min-h-0 min-w-0 overflow-hidden">
-                  <RoundHistoryTable rounds={attempt.rounds} unit={unit} dense />
+              <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4 shrink-0 min-h-0">
+                <div className="min-h-0 min-w-0 relative">
+                  <div className="absolute inset-0 overflow-hidden">
+                    <RoundHistoryTable rounds={attempt.rounds} unit={unit} dense />
+                  </div>
                 </div>
                 <div className="min-h-0 overflow-hidden">
                   <PipelineStrip
                     opening={opening}
                     delay={config.delivery_delay}
                     pipeline={attempt.pipeline}
-                    pendingOrder={orderInput}
                     supplyRate={opening?.supplyRate}
                     timelineUnit={unit}
                     compact

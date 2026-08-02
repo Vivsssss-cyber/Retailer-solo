@@ -39,7 +39,7 @@ export function TrendPanel({
         xAxis: "Rounds",
         yAxis: ["Inventory", "Backlog", "Demand", "Orders", "Delivery"],
         chartData,
-        height: chartHeight,
+        height: dense ? "100%" : chartHeight,
       };
     }
     return {
@@ -48,9 +48,9 @@ export function TrendPanel({
       xAxis: "Rounds",
       yAxis: ["Total Cost"],
       chartData,
-      height: chartHeight,
+      height: dense ? "100%" : chartHeight,
     };
-  }, [tab, chartData, chartHeight]);
+  }, [tab, chartData, chartHeight, dense]);
 
   return (
     <div

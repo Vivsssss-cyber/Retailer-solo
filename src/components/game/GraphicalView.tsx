@@ -20,7 +20,7 @@ export interface EvolutionChartData {
   type?: "evolution";
   chartData?: Record<string, string | number>[];
   /** Compact height for single-screen play */
-  height?: number;
+  height?: number | string;
 }
 
 interface GraphicalViewProps {
@@ -104,8 +104,11 @@ export default function GraphicalView({ data }: GraphicalViewProps) {
         border: "1.4px solid white",
         borderRadius: 16,
         padding: 16,
-        minHeight: height,
+        minHeight: typeof height === "number" ? height : 0,
+        height: typeof height === "string" ? height : undefined,
         boxShadow: "0px 3px 8px rgba(0, 0, 0, 0.06)",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       {data.title ? (
@@ -157,8 +160,8 @@ export default function GraphicalView({ data }: GraphicalViewProps) {
         ))}
       </div>
 
-      <div className="w-full" style={{ height }}>
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="w-full flex-1 min-h-0" style={{ height: typeof height === "string" ? height : undefined }}>
+        <ResponsiveContainer width="100%" height={typeof height === "string" ? "100%" : height}>
           <LineChart
             data={data.chartData}
             margin={{ top: 24, right: showCosts ? 48 : 12, left: 0, bottom: 20 }}
