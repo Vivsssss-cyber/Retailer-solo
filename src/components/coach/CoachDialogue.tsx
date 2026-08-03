@@ -8,28 +8,30 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-const dialogueTextStyle: React.CSSProperties = {
-  fontFamily: FO,
-  fontSize: 14,
-  fontWeight: 600,
-  lineHeight: 1.5,
-  color: "var(--sv-ink)",
-  margin: 0,
-};
-
 /**
  * RPG-style typewriter. Reserves full-line height so typing never shifts layout.
  */
 export function CoachDialogue({
   text,
   cps = 36,
+  compact = false,
   onComplete,
 }: {
   text: string;
   cps?: number;
+  /** Tighter type for play overlay on small screens. */
+  compact?: boolean;
   /** Fires once when typing finishes (or is skipped / reduced-motion). */
   onComplete?: () => void;
 }) {
+  const dialogueTextStyle: React.CSSProperties = {
+    fontFamily: FO,
+    fontSize: compact ? 13 : 14,
+    fontWeight: 600,
+    lineHeight: compact ? 1.4 : 1.5,
+    color: "var(--sv-ink)",
+    margin: 0,
+  };
   const [count, setCount] = useState(0);
   const [done, setDone] = useState(false);
   const [activeText, setActiveText] = useState(text);

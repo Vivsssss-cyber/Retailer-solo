@@ -21,8 +21,8 @@ type CoachOverlayProps = {
 };
 
 /**
- * Fixed corner overlay — coach says recommendations / alerts,
- * then auto-fades after the line finishes (manual dismiss still works).
+ * Fixed overlay — sits above the place-order dock on mobile,
+ * bottom-right on larger screens. Auto-fades after speaking.
  */
 export function CoachOverlay({
   message,
@@ -68,18 +68,29 @@ export function CoachOverlay({
 
   return (
     <div
-      className="fixed z-[60] bottom-[calc(7.25rem+env(safe-area-inset-bottom))] left-3 right-3 sm:left-auto sm:right-5 sm:bottom-[calc(6.5rem+env(safe-area-inset-bottom))] lg:bottom-8 lg:right-6 max-w-[min(420px,calc(100vw-24px))] sm:max-w-[min(420px,calc(100vw-40px))]"
+      className={[
+        "fixed z-[60] pointer-events-none",
+        // Clear the 2-row place-order dock + safe area on phones
+        "left-2 right-2 bottom-[calc(11.25rem+env(safe-area-inset-bottom,0px))]",
+        // Tablet+: float above dock, right-aligned
+        "sm:left-auto sm:right-4 sm:bottom-[calc(7.5rem+env(safe-area-inset-bottom,0px))]",
+        "sm:w-[min(380px,calc(100vw-2rem))]",
+        // Wide: a bit lower (dock is single-row pill)
+        "lg:bottom-8 lg:right-6 lg:w-[min(400px,calc(100vw-3rem))]",
+      ].join(" ")}
       role="status"
       aria-label={message.label ?? "Coach recommendation"}
       aria-live="polite"
-      style={{
-        opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0)" : "translateY(12px)",
-        transition: `opacity ${fadeMs}ms ease, transform ${fadeMs}ms ease`,
-        pointerEvents: visible ? "auto" : "none",
-      }}
     >
-      <div className="relative">
+      <div
+        className="pointer-events-auto w-full"
+        style={{
+          opacity: visible ? 1 : 0,
+          transform: visible ? "translateY(0)" : "translateY(10px)",
+          transition: `opacity ${fadeMs}ms ease, transform ${fadeMs}ms ease`,
+          pointerEvents: visible ? "auto" : "none",
+        }}
+      >
         <CoachSpeech
           line={message.text}
           messageKey={message.id}

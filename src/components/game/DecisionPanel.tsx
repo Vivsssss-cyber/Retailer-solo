@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { FO, GameButton } from "@/components/cyan";
 import { Package } from "@/components/cyan/PixelIcons";
 import { expectedArrivalRound } from "@/engine";
@@ -46,6 +47,16 @@ export function DecisionPanel({
   const digitSlots = Math.min(maxDigits, Math.max(2, valueDigits));
   const inputWidth = `calc(${digitSlots}ch + 10px)`;
 
+  const stepperShell: CSSProperties = {
+    background: "rgba(255,255,255,0.88)",
+    border: "1.4px solid var(--sv-border)",
+    borderRadius: "var(--sv-radius-pill)",
+    padding: "3px 4px",
+    height: 48,
+    minHeight: 48,
+    overflow: "hidden",
+  };
+
   return (
     <div
       role="region"
@@ -53,17 +64,17 @@ export function DecisionPanel({
       className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 w-[min(720px,calc(100vw-1rem))] sm:w-[min(740px,calc(100vw-1.5rem))] pointer-events-none"
     >
       <div
-        className="sv-frost-dock pointer-events-auto flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 rounded-sv-pill"
+        className="sv-frost-dock pointer-events-auto flex flex-col gap-2.5 rounded-[var(--sv-radius-2xl)] p-3 sm:flex-row sm:items-center sm:gap-3 sm:rounded-[var(--sv-radius-pill)] sm:py-2.5 sm:pr-2.5 sm:pl-3.5"
         style={{
-          padding: "10px 10px 10px 14px",
           border: "1.5px solid var(--sv-border)",
           backdropFilter: "blur(56px) saturate(1.55)",
           WebkitBackdropFilter: "blur(56px) saturate(1.55)",
         }}
       >
-        <div className="flex items-start sm:items-center gap-2.5 min-w-0 flex-1 px-0.5 sm:px-0">
+        {/* Header: title + round left, arrival right (mobile + desktop) */}
+        <div className="flex min-w-0 flex-1 items-start gap-2.5 sm:items-center">
           <div
-            className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
             style={{
               background: "var(--sv-cyan-tint)",
               border: "1px solid var(--sv-border)",
@@ -72,9 +83,10 @@ export function DecisionPanel({
           >
             <Package size={16} color="var(--sv-teal-mid)" />
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span
+
+          <div className="flex min-w-0 flex-1 items-start justify-between gap-2 sm:items-center sm:gap-3">
+            <div className="min-w-0 shrink">
+              <div
                 style={{
                   fontFamily: FO,
                   fontSize: 15,
@@ -82,16 +94,20 @@ export function DecisionPanel({
                   color: "var(--sv-ink)",
                   letterSpacing: "-0.01em",
                   lineHeight: 1.2,
+                  whiteSpace: "nowrap",
                 }}
               >
                 Place order
-              </span>
-              <span
+              </div>
+              <div
+                className="mt-0.5"
                 style={{
                   fontFamily: FO,
                   fontSize: 12,
                   fontWeight: 600,
                   color: "var(--sv-text-secondary)",
+                  lineHeight: 1.25,
+                  whiteSpace: "nowrap",
                 }}
               >
                 {timelineUnit} {currentRound}
@@ -99,16 +115,19 @@ export function DecisionPanel({
                   {" "}
                   of {totalRounds}
                 </span>
-              </span>
+              </div>
             </div>
+
             <p
-              className="mt-0.5 line-clamp-2 sm:line-clamp-1"
+              className="max-w-[52%] shrink-0 text-right sm:max-w-none sm:whitespace-nowrap"
               style={{
                 fontFamily: FO,
-                fontSize: 12,
-                fontWeight: 500,
+                fontSize: 11,
+                fontWeight: 600,
                 color: arrivesAfterEnd ? "var(--sv-warning)" : "var(--sv-text-secondary)",
-                lineHeight: 1.35,
+                lineHeight: 1.3,
+                margin: 0,
+                paddingTop: 2,
               }}
             >
               {arrivalCopy}
@@ -116,23 +135,18 @@ export function DecisionPanel({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto sm:shrink-0">
+        {/* Controls: pill stepper + confirm */}
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
           <div
-            className="flex items-center gap-0.5 flex-1 sm:flex-initial justify-center rounded-sv-pill"
-            style={{
-              background: "rgba(255,255,255,0.82)",
-              border: "1.4px solid var(--sv-border)",
-              padding: "3px 4px",
-              height: 48,
-              minHeight: 48,
-            }}
+            className="flex flex-1 items-center justify-center gap-0.5 sm:flex-initial"
+            style={stepperShell}
           >
             <button
               type="button"
               aria-label="Decrease order"
               disabled={disabled || value <= 0}
               onClick={() => onChange(Math.max(0, value - 1))}
-              className="w-11 h-11 sm:w-10 sm:h-10 rounded-full flex items-center justify-center disabled:opacity-35 touch-manipulation transition-colors hover:bg-sv-cyan-tint/70"
+              className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full transition-colors hover:bg-sv-cyan-tint/70 disabled:opacity-35 sm:h-10 sm:w-10"
               style={{
                 color: "var(--sv-teal-mid)",
                 fontSize: 22,
@@ -155,7 +169,6 @@ export function DecisionPanel({
                   onChange(0);
                   return;
                 }
-                // Cap to 5 digits while typing; clamp to maxOrder
                 const digitsOnly = raw.replace(/\D/g, "").slice(0, 5);
                 const n = Number(digitsOnly);
                 if (!Number.isFinite(n)) {
@@ -180,6 +193,7 @@ export function DecisionPanel({
                 textAlign: "center",
                 letterSpacing: "-0.02em",
                 transition: "width 120ms ease",
+                borderRadius: 0,
               }}
             />
             <button
@@ -187,7 +201,7 @@ export function DecisionPanel({
               aria-label="Increase order"
               disabled={disabled || value >= maxOrder}
               onClick={() => onChange(Math.min(maxOrder, value + 1))}
-              className="w-11 h-11 sm:w-10 sm:h-10 rounded-full flex items-center justify-center disabled:opacity-35 touch-manipulation transition-colors hover:bg-sv-cyan-tint/70"
+              className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full transition-colors hover:bg-sv-cyan-tint/70 disabled:opacity-35 sm:h-10 sm:w-10"
               style={{
                 color: "var(--sv-teal-mid)",
                 fontSize: 22,
@@ -203,13 +217,14 @@ export function DecisionPanel({
             type="button"
             disabled={disabled}
             onClick={onConfirm}
-            className="shrink-0 flex-1 sm:flex-initial touch-manipulation rounded-sv-pill bg-sv-cta-gradient text-white border border-white/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_1px_3px_rgba(0,44,51,0.18)]"
+            className="shrink-0 flex-1 touch-manipulation rounded-[var(--sv-radius-pill)] border border-white/60 bg-sv-cta-gradient text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_1px_3px_rgba(0,44,51,0.18)] sm:flex-initial"
             style={{
               height: 48,
               minHeight: 48,
-              padding: "0 22px",
+              padding: "0 20px",
               fontWeight: 700,
               fontSize: 14,
+              borderRadius: "var(--sv-radius-pill)",
             }}
           >
             <span className="sm:hidden">Confirm</span>

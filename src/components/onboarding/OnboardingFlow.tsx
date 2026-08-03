@@ -1249,9 +1249,9 @@ export default function OnboardingFlow() {
               )}
           </section>
 
-          {/* Coach + bubble as one right-side unit */}
+          {/* Coach + bubble — stacked on phone, right unit on desktop */}
           {showCoach && (
-            <div className="flex justify-center lg:justify-end self-center order-first lg:order-none">
+            <div className="flex w-full max-w-full justify-center self-center order-first px-1 sm:px-0 sm:max-w-none lg:order-none lg:w-auto lg:justify-end">
               <CoachSpeech line={coachLine} messageKey={stepId} size="lg" />
             </div>
           )}
