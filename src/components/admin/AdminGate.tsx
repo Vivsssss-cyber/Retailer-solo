@@ -1,29 +1,22 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { FO, GameButton, GridBackground, PageTransition, cardStyle } from "@/components/cyan";
 import { ADMIN_PIN, isAdminUnlocked, unlockAdmin } from "@/lib/adminConfigStore";
 
+/** sessionStorage has no change events in-tab; PIN unlock updates local state. */
+const subscribeNoop = () => () => {};
+
 export function AdminGate({ children }: { children: ReactNode }) {
-  const [ready, setReady] = useState(false);
-  const [unlocked, setUnlocked] = useState(false);
+  const sessionUnlocked = useSyncExternalStore(
+    subscribeNoop,
+    isAdminUnlocked,
+    () => false,
+  );
+  const [localUnlocked, setLocalUnlocked] = useState(false);
+  const unlocked = sessionUnlocked || localUnlocked;
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setUnlocked(isAdminUnlocked());
-    setReady(true);
-  }, []);
-
-  if (!ready) {
-    return (
-      <GridBackground>
-        <main className="max-w-md mx-auto px-4 py-16">
-          <p style={{ fontFamily: FO, color: "var(--sv-text-muted)" }}>Loading…</p>
-        </main>
-      </GridBackground>
-    );
-  }
 
   if (!unlocked) {
     return (
@@ -59,7 +52,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
                 onChange={(e) => setPin(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
-                    if (unlockAdmin(pin)) setUnlocked(true);
+                    if (unlockAdmin(pin)) setLocalUnlocked(true);
                     else setError("Incorrect PIN");
                   }
                 }}
@@ -84,7 +77,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
                 type="button"
                 style={{ width: "100%" }}
                 onClick={() => {
-                  if (unlockAdmin(pin)) setUnlocked(true);
+                  if (unlockAdmin(pin)) setLocalUnlocked(true);
                   else setError("Incorrect PIN");
                 }}
               >

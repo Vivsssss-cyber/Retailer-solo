@@ -111,6 +111,7 @@ Copy `.env.example` → `.env.local`:
 | `docs/BACKEND_GUIDE.md` | Backend: formulas, tables, API, acceptance |
 | `docs/API_CONTRACT.md` | Endpoint cheat sheet |
 | `docs/DESIGN_SOURCE.md` | Design provenance from classic beer game |
+| `docs/DEPLOY.md` | Live Mode: Render Starter + disk (or Railway) |
 
 ---
 
@@ -141,6 +142,14 @@ Copy `.env.example` → `.env.local`:
 - Postgres (or other multi-instance) store  
 - Staging E2E mock-off sign-off  
 - ~~Admin config → server~~ (done: PUT config + admin editor dual-write)  
+
+### Live deploy path (this week)
+
+- **Host:** Render Starter (or Railway) — single Node web service + persistent disk  
+- **Runbook:** `docs/DEPLOY.md` · Blueprint: `render.yaml`  
+- **Required env:** `NEXT_PUBLIC_USE_MOCK=false`, `DATA_DIR=/var/data`  
+- **Do not** use free-tier sleepers for multiplayer heats; **do not** use Vercel until Postgres  
+
 
 ### Added from solo-beergame prototype (2026-08-02)
 

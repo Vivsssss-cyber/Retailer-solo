@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import path from "path";
-import { DEFAULT_CONFIG } from "@/engine";
+import { DEFAULT_CONFIG, migrateGameConfig } from "@/engine";
 import { emptyStore, type DataStore } from "./types";
 
 /**
@@ -56,6 +56,16 @@ function ensureSeeded(store: DataStore): DataStore {
       name: "Default event",
       configuration_id: DEFAULT_CONFIG.configuration_id,
     };
+  }
+  // Legacy max order 100 → 10000 on v1 snapshots
+  for (const id of Object.keys(store.configurations)) {
+    store.configurations[id] = migrateGameConfig(store.configurations[id]!);
+  }
+  for (const heat of Object.values(store.heats ?? {})) {
+    heat.configuration = migrateGameConfig(heat.configuration);
+  }
+  for (const attempt of Object.values(store.attempts ?? {})) {
+    attempt.configuration = migrateGameConfig(attempt.configuration);
   }
   return store;
 }

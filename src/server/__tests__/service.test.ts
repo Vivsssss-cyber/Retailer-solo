@@ -144,7 +144,7 @@ describe("submitRound", () => {
     const attempt = await createAttempt(heat.heat_id, { player_name: "Ava" });
     const res = await submitRound(attempt.attempt_id, {
       round: 1,
-      placed_order: 9999,
+      placed_order: DEFAULT_CONFIG.maximum_order + 1,
     });
     expect(res.round_record.placed_order).toBe(
       DEFAULT_CONFIG.maximum_order,

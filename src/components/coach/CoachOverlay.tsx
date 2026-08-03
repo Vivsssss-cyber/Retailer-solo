@@ -30,30 +30,34 @@ export function CoachOverlay({
   holdMs = 2200,
   fadeMs = 450,
 }: CoachOverlayProps) {
+  const messageId = message?.id ?? null;
   const [visible, setVisible] = useState(false);
   const [doneTyping, setDoneTyping] = useState(false);
+  const [trackedId, setTrackedId] = useState<string | null>(messageId);
 
-  // Enter animation whenever a new message arrives
-  useEffect(() => {
-    if (!message) {
-      setVisible(false);
-      setDoneTyping(false);
-      return;
-    }
+  // Sync enter/reset state when the message identity changes (render-time adjust).
+  if (messageId !== trackedId) {
+    setTrackedId(messageId);
     setDoneTyping(false);
+    setVisible(false);
+  }
+
+  // Enter animation after a new message mounts (rAF = async, not sync-in-effect).
+  useEffect(() => {
+    if (!messageId) return;
     const id = window.requestAnimationFrame(() => setVisible(true));
     return () => window.cancelAnimationFrame(id);
-  }, [message?.id]);
+  }, [messageId]);
 
   // After typewriter finishes → hold → fade → dismiss
   useEffect(() => {
-    if (!doneTyping || !message) return;
+    if (!doneTyping || !messageId) return;
     const hold = window.setTimeout(() => {
       setVisible(false);
       window.setTimeout(() => onDismiss(), fadeMs);
     }, holdMs);
     return () => window.clearTimeout(hold);
-  }, [doneTyping, message, holdMs, fadeMs, onDismiss]);
+  }, [doneTyping, messageId, holdMs, fadeMs, onDismiss]);
 
   // Must stay above any early return — hooks order cannot change across renders.
   const handleDialogueComplete = useCallback(() => {
@@ -64,7 +68,7 @@ export function CoachOverlay({
 
   return (
     <div
-      className="fixed z-[60] bottom-20 right-3 sm:bottom-24 sm:right-5 lg:bottom-8 lg:right-6 max-w-[min(420px,calc(100vw-24px))]"
+      className="fixed z-[60] bottom-[calc(7.25rem+env(safe-area-inset-bottom))] left-3 right-3 sm:left-auto sm:right-5 sm:bottom-[calc(6.5rem+env(safe-area-inset-bottom))] lg:bottom-8 lg:right-6 max-w-[min(420px,calc(100vw-24px))] sm:max-w-[min(420px,calc(100vw-40px))]"
       role="status"
       aria-label={message.label ?? "Coach recommendation"}
       aria-live="polite"

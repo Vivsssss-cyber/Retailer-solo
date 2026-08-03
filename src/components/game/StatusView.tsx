@@ -27,9 +27,48 @@ const customStyles = `
 .sv-stage-node {
   transition: transform 200ms ${EASE_OUT}, box-shadow 200ms ${EASE_OUT}, border-color 200ms ${EASE_OUT};
   transform: scale(1);
+  width: var(--sv-node-size, 72px);
+  height: var(--sv-node-size, 72px);
 }
 .sv-stage-node.sv-active {
   transform: scale(1.04);
+}
+.sv-stage-icon-well {
+  width: var(--sv-icon-well, 50px);
+  height: var(--sv-icon-well, 50px);
+}
+.sv-stage-icon-well img,
+.sv-stage-icon-well svg {
+  max-width: 72%;
+  max-height: 72%;
+}
+.sv-status-rail {
+  top: calc(var(--sv-node-size, 72px) / 2);
+}
+.sv-player-avatar-frame {
+  width: var(--sv-avatar-size, 64px);
+  height: var(--sv-avatar-size, 64px);
+}
+/* Phones: shrink rail nodes so 3 stages + labels fit without overflow */
+@media (max-width: 640px) {
+  .sv-status-view--sim {
+    --sv-node-size: 56px;
+    --sv-icon-well: 36px;
+    --sv-rail-top: 64px;
+    --sv-avatar-size: 48px;
+    padding: 12px 10px 10px !important;
+  }
+  .sv-status-view:not(.sv-status-view--sim) {
+    --sv-node-size: 52px;
+    --sv-icon-well: 34px;
+  }
+  .sv-status-stage-label {
+    font-size: 11px !important;
+  }
+  .sv-status-sim-area {
+    padding-top: 72px !important;
+    min-height: 240px !important;
+  }
 }
 @media (hover: hover) and (pointer: fine) {
   .sv-float-marker:hover .sv-float-marker-inner {
@@ -160,14 +199,25 @@ export default function StatusView({
   const nextCenter = getCenterPct(Math.min(data.stages.length - 1, currentIdx + 1));
 
   const showPlayerAvatar = Boolean(playerAvatarSrc) && showSimulation;
+  // Prefer CSS vars so mobile can scale without JS matchMedia.
   const nodeSize = showSimulation ? 88 : 72;
   const iconWell = showSimulation ? 58 : 50;
   const railTop = showSimulation ? 92 : 56;
 
   return (
     <div
-      className="sv-glass-card relative h-full flex flex-col"
-      style={{ padding: showSimulation ? "18px 20px 16px" : 16 }}
+      className={`sv-glass-card sv-status-view relative h-full flex flex-col ${
+        showSimulation ? "sv-status-view--sim" : ""
+      }`}
+      style={
+        {
+          padding: showSimulation ? "14px 12px 12px" : 12,
+          ["--sv-node-size" as string]: `${nodeSize}px`,
+          ["--sv-icon-well" as string]: `${iconWell}px`,
+          ["--sv-rail-top" as string]: `${railTop}px`,
+          ["--sv-avatar-size" as string]: "64px",
+        } as React.CSSProperties
+      }
     >
       <style dangerouslySetInnerHTML={{ __html: customStyles }} />
 
@@ -220,7 +270,7 @@ export default function StatusView({
       )}
 
       <div
-        className="relative w-full"
+        className={`relative w-full ${showSimulation ? "sv-status-sim-area" : ""}`}
         style={{
           paddingTop: showSimulation ? 96 : 12,
           paddingBottom: showPlayerAvatar ? 8 : 4,
@@ -229,7 +279,10 @@ export default function StatusView({
       >
         {/* Travel markers (above rail) */}
         {showSimulation && (
-          <div className="absolute inset-x-0 top-0 z-30" style={{ height: railTop + 8 }}>
+          <div
+            className="absolute inset-x-0 top-0 z-30"
+            style={{ height: "calc(var(--sv-rail-top, 92px) + 8px)" }}
+          >
             {data.incomingAmount !== undefined && currentIdx > 0 && (
               <FlowMarker
                 id="received"
@@ -278,9 +331,8 @@ export default function StatusView({
           {/* Base rail */}
           <div
             aria-hidden
-            className="absolute"
+            className="absolute sv-status-rail"
             style={{
-              top: nodeSize / 2,
               left: `${segmentWidth / 2}%`,
               right: `${segmentWidth / 2}%`,
               height: 3,
@@ -294,9 +346,8 @@ export default function StatusView({
             <>
               <div
                 aria-hidden
-                className="absolute"
+                className="absolute sv-status-rail"
                 style={{
-                  top: nodeSize / 2,
                   left: `${prevCenter}%`,
                   width: `${currentCenter - prevCenter}%`,
                   height: 3,
@@ -310,7 +361,6 @@ export default function StatusView({
               {showSimulation && data.incomingAmount !== undefined && (
                 <RailLineArrow
                   xPct={(prevCenter + currentCenter) / 2 + 4}
-                  top={nodeSize / 2}
                   direction="right"
                   color="var(--sv-positive)"
                 />
@@ -318,7 +368,6 @@ export default function StatusView({
               {showSimulation && data.orderAmount !== undefined && (
                 <RailLineArrow
                   xPct={(prevCenter + currentCenter) / 2 - 4}
-                  top={nodeSize / 2}
                   direction="left"
                   color="var(--sv-teal-mid)"
                 />
@@ -329,9 +378,8 @@ export default function StatusView({
             <>
               <div
                 aria-hidden
-                className="absolute"
+                className="absolute sv-status-rail"
                 style={{
-                  top: nodeSize / 2,
                   left: `${currentCenter}%`,
                   width: `${nextCenter - currentCenter}%`,
                   height: 3,
@@ -345,7 +393,6 @@ export default function StatusView({
               {showSimulation && data.outgoingAmount !== undefined && (
                 <RailLineArrow
                   xPct={(currentCenter + nextCenter) / 2}
-                  top={nodeSize / 2}
                   direction="right"
                   color="var(--sv-teal-mid)"
                 />
@@ -364,13 +411,11 @@ export default function StatusView({
                 <div
                   key={stage}
                   className="flex flex-col items-center"
-                  style={{ width: `${segmentWidth}%`, gap: 10 }}
+                  style={{ width: `${segmentWidth}%`, gap: 8 }}
                 >
                   <div
                     className={`sv-stage-node ${isActive ? "sv-active" : ""}`}
                     style={{
-                      width: nodeSize,
-                      height: nodeSize,
                       borderRadius: showSimulation ? 18 : 16,
                       background: "var(--sv-gradient-strategic)",
                       border: isActive
@@ -385,9 +430,8 @@ export default function StatusView({
                     }}
                   >
                     <div
+                      className="sv-stage-icon-well"
                       style={{
-                        width: iconWell,
-                        height: iconWell,
                         borderRadius: 9999,
                         background: isActive
                           ? "rgba(255,255,255,0.28)"
@@ -405,6 +449,7 @@ export default function StatusView({
 
                   <div className="flex flex-col items-center gap-0.5">
                     <span
+                      className="sv-status-stage-label text-center px-0.5"
                       style={{
                         fontFamily: FO,
                         fontWeight: 700,
@@ -450,10 +495,9 @@ export default function StatusView({
                         }}
                       />
                       <div
+                        className="sv-player-avatar-frame"
                         style={{
                           position: "relative",
-                          width: 64,
-                          height: 64,
                           borderRadius: 16,
                           background:
                             "linear-gradient(160deg, var(--sv-cyan-tint), var(--sv-card-solid))",
@@ -473,43 +517,29 @@ export default function StatusView({
                           width={58}
                           height={58}
                           style={{
-                            width: 58,
-                            height: 58,
+                            width: "90%",
+                            height: "90%",
                             objectFit: "contain",
                             imageRendering: "pixelated",
                           }}
                         />
                       </div>
-                      <div className="flex flex-col items-center gap-0.5">
+                      {playerName && (
                         <span
                           style={{
                             fontFamily: FO,
-                            fontSize: 10,
+                            fontSize: 12,
                             fontWeight: 700,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.07em",
-                            color: "var(--sv-teal-mid)",
+                            color: "var(--sv-ink)",
+                            maxWidth: 110,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
                           }}
                         >
-                          Operator
+                          {playerName}
                         </span>
-                        {playerName && (
-                          <span
-                            style={{
-                              fontFamily: FO,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: "var(--sv-ink)",
-                              maxWidth: 110,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {playerName}
-                          </span>
-                        )}
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -526,22 +556,19 @@ export default function StatusView({
 /** Filled chevron centered on a rail segment — no glow. */
 function RailLineArrow({
   xPct,
-  top,
   direction,
   color,
 }: {
   xPct: number;
-  top: number;
   direction: "left" | "right";
   color: string;
 }) {
   return (
     <div
       aria-hidden
-      className="absolute z-[5] pointer-events-none"
+      className="absolute z-[5] pointer-events-none sv-status-rail"
       style={{
         left: `${xPct}%`,
-        top,
         transform: "translate(-50%, -50%)",
         display: "flex",
         alignItems: "center",

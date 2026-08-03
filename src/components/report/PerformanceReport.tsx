@@ -146,10 +146,10 @@ export function PerformanceReportView({
   };
 
   return (
-    <div className="max-w-[1100px] mx-auto space-y-5 pb-12">
+    <div className="max-w-[1100px] mx-auto space-y-4 sm:space-y-5 pb-12">
       {/* Actions — no-print */}
-      <div className="flex flex-wrap gap-2 no-print">
-        <GameButton type="button" onClick={onPlayAgain}>
+      <div className="flex flex-col sm:flex-row flex-wrap gap-2 no-print">
+        <GameButton type="button" onClick={onPlayAgain} className="w-full sm:w-auto touch-manipulation">
           Play again
         </GameButton>
         <GameButton
@@ -157,17 +157,26 @@ export function PerformanceReportView({
           variant="secondary"
           disabled={exporting}
           onClick={() => void handleDownloadPdf()}
+          className="w-full sm:w-auto touch-manipulation"
         >
           {exporting ? "Preparing PDF…" : "Download report PDF"}
         </GameButton>
-        <GameButton type="button" variant="outline" onClick={handleExportCsv}>
+        <GameButton
+          type="button"
+          variant="outline"
+          onClick={handleExportCsv}
+          className="w-full sm:w-auto touch-manipulation"
+        >
           Export CSV
         </GameButton>
       </div>
 
-      <div ref={pdfRef} className="space-y-5">
+      <div ref={pdfRef} className="space-y-4 sm:space-y-5">
         {/* Hero header — beer game report style */}
-        <div style={{ ...cardStyle, padding: 28 }} className="text-center relative">
+        <div
+          style={{ ...cardStyle }}
+          className="text-center relative p-4 sm:p-7"
+        >
           <div
             className="flex items-center justify-center gap-2 mb-4"
             style={{ color: "var(--sv-text)" }}
@@ -325,7 +334,7 @@ export function PerformanceReportView({
               </div>
             )}
             <div className="overflow-x-auto">
-              <table className="w-full" style={{ fontFamily: FO, fontSize: 13, borderCollapse: "collapse" }}>
+              <table className="w-full min-w-[480px]" style={{ fontFamily: FO, fontSize: 13, borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ color: "var(--sv-text-muted)", textAlign: "left" }}>
                     <th style={thStyle}>#</th>
@@ -435,43 +444,52 @@ export function PerformanceReportView({
           </p>
         </div>
 
-        {/* Evolution charts */}
-        <GraphicalView
-          data={{
-            type: "evolution",
-            title: "Inventory, backlog, demand, orders & delivery",
-            yAxis: ["Inventory", "Backlog", "Demand", "Orders", "Delivery"],
-            xAxis: unit + "s",
-            chartData: flowData,
-            height: 300,
-          }}
-        />
+        {/* Evolution charts — responsive plot host (fills on wide, compact on narrow) */}
+        <div className="w-full min-w-0 h-[clamp(220px,42vw,360px)] sm:h-[clamp(260px,36vw,380px)]">
+          <GraphicalView
+            data={{
+              type: "evolution",
+              title: "Inventory, backlog, demand, orders & delivery",
+              yAxis: ["Inventory", "Backlog", "Demand", "Orders", "Delivery"],
+              xAxis: unit + "s",
+              chartData: flowData,
+              fill: true,
+              height: 300,
+            }}
+          />
+        </div>
 
-        <GraphicalView
-          data={{
-            type: "evolution",
-            title: "Orders vs. Final Demand",
-            yAxis: ["Demand", "Orders"],
-            xAxis: unit + "s",
-            chartData: rounds.map((r) => ({
-              name: `R${r.round}`,
-              Demand: r.customer_demand,
-              Orders: r.placed_order,
-            })),
-            height: 280,
-          }}
-        />
+        <div className="w-full min-w-0 h-[clamp(200px,38vw,320px)] sm:h-[clamp(240px,32vw,340px)]">
+          <GraphicalView
+            data={{
+              type: "evolution",
+              title: "Orders vs. Final Demand",
+              yAxis: ["Demand", "Orders"],
+              xAxis: unit + "s",
+              chartData: rounds.map((r) => ({
+                name: `R${r.round}`,
+                Demand: r.customer_demand,
+                Orders: r.placed_order,
+              })),
+              fill: true,
+              height: 280,
+            }}
+          />
+        </div>
 
-        <GraphicalView
-          data={{
-            type: "evolution",
-            title: "Cumulative cost over time",
-            yAxis: ["Total Cost"],
-            xAxis: unit + "s",
-            chartData: costData,
-            height: 260,
-          }}
-        />
+        <div className="w-full min-w-0 h-[clamp(200px,36vw,300px)] sm:h-[clamp(220px,30vw,320px)]">
+          <GraphicalView
+            data={{
+              type: "evolution",
+              title: "Cumulative cost over time",
+              yAxis: ["Total Cost"],
+              xAxis: unit + "s",
+              chartData: costData,
+              fill: true,
+              height: 260,
+            }}
+          />
+        </div>
 
         {/* Variability — beer game style */}
         <div style={{ ...cardStyle, padding: 20 }}>
@@ -520,7 +538,7 @@ export function PerformanceReportView({
             Cost breakdown by {unit.toLowerCase()}
           </h2>
           <div className="overflow-x-auto">
-            <table className="w-full" style={{ fontFamily: FO, fontSize: 12, borderCollapse: "collapse" }}>
+            <table className="w-full min-w-[560px]" style={{ fontFamily: FO, fontSize: 12, borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ color: "var(--sv-text-muted)", textAlign: "center" }}>
                   {[unit, "Stock", "Backlog", "Inv. cost", "Backlog cost", "Round cost", "Accum."].map(
@@ -660,7 +678,7 @@ export function PerformanceReportView({
               </h3>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full" style={{ fontFamily: FO, fontSize: 12, borderCollapse: "collapse" }}>
+              <table className="w-full min-w-[560px]" style={{ fontFamily: FO, fontSize: 12, borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ color: "var(--sv-text-muted)", textAlign: "left" }}>
                     <th style={thStyle}>#</th>

@@ -5,9 +5,12 @@ import type { GameConfig } from "./types";
  * Demand steps up mid-game so players feel pipeline lag; supply has mild disruptions.
  * Lock official sequences with PM before event leaderboards go live.
  */
+/** Previous product default; v1 snapshots with this value are upgraded. */
+const LEGACY_MAXIMUM_ORDER = 100;
+
 export const DEFAULT_CONFIG: GameConfig = {
   configuration_id: "eu-retailer-challenge-v1",
-  configuration_version: 1,
+  configuration_version: 2,
   demand_sequence_id: "eu-demand-v1",
   supply_sequence_id: "eu-supply-v1",
   intro_text:
@@ -24,7 +27,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   inventory_cost_per_unit: 5,
   backlog_cost_per_unit: 10,
   minimum_order: 0,
-  maximum_order: 100,
+  maximum_order: 10000,
   maximum_players_per_heat: 4,
   leaderboard_enabled: true,
   global_leaderboard_enabled: true,
@@ -40,6 +43,22 @@ export const DEFAULT_CONFIG: GameConfig = {
     },
   ],
 };
+
+/**
+ * Raise legacy max order (100 → 10000) on v1 configs snapshotted before the product default change.
+ * Intentional max of 100 after version ≥ 2 is left alone.
+ */
+export function migrateGameConfig(config: GameConfig): GameConfig {
+  const version = config.configuration_version ?? 1;
+  if (version <= 1 && config.maximum_order === LEGACY_MAXIMUM_ORDER) {
+    return {
+      ...config,
+      maximum_order: DEFAULT_CONFIG.maximum_order,
+      configuration_version: Math.max(version, DEFAULT_CONFIG.configuration_version),
+    };
+  }
+  return config;
+}
 
 export function fingerprintFromConfig(config: GameConfig) {
   return {

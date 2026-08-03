@@ -109,7 +109,7 @@ export function SupplyChainAnimation({
 
   return (
     <motion.div
-      className="flex flex-col gap-3 w-full"
+      className="flex flex-col gap-3 w-full max-w-full overflow-x-hidden"
       variants={containerVariants}
       initial="hidden"
       animate="show"
@@ -178,10 +178,10 @@ function SummaryLayout({
     <>
       <Wrap className="flex flex-col gap-1" {...wrapProps}>
         <h1
+          className="text-[18px] sm:text-[22px]"
           style={{
             fontFamily: FO,
             fontWeight: 800,
-            fontSize: 22,
             color: "var(--sv-ink)",
             letterSpacing: "-0.3px",
             lineHeight: 1.2,
@@ -284,19 +284,15 @@ function SummaryLayout({
       </Wrap>
 
       <Wrap
+        className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3"
         style={{
           ...cardStyle,
           padding: 14,
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
         }}
         {...wrapProps}
       >
         {pos != null ? (
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
             <Trophy size={16} color="var(--sv-teal-mid)" />
             <p
               style={{
@@ -333,7 +329,12 @@ function SummaryLayout({
             Fulfilled {fulfilled} · order {record.placed_order} upstream
           </p>
         )}
-        <GameButton type="button" onClick={onContinue} size="lg">
+        <GameButton
+          type="button"
+          onClick={onContinue}
+          size="lg"
+          className="w-full sm:w-auto touch-manipulation"
+        >
           {isFinalRound
             ? "View final report"
             : `Continue to next ${unit.toLowerCase()}`}

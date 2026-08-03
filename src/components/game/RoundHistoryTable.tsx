@@ -42,12 +42,19 @@ export function RoundHistoryTable({
       >
         Game progress
       </h3>
+      {/*
+        Dense play shell: fill parent (no max-h trap) so big screens give
+        height to game progress. Standalone: keep a sensible scroll cap.
+      */}
       <div
-        className={`overflow-x-auto overflow-y-auto min-h-0 flex-1 ${
-          dense ? "max-h-[132px]" : "max-h-[220px]"
+        className={`overflow-x-auto overflow-y-auto min-h-0 flex-1 -mx-0.5 ${
+          dense ? "" : "max-h-[220px]"
         }`}
       >
-        <table className="w-full" style={{ fontFamily: FO, fontSize: 12, borderCollapse: "collapse" }}>
+        <table
+          className="w-full min-w-[520px]"
+          style={{ fontFamily: FO, fontSize: 12, borderCollapse: "collapse" }}
+        >
           <thead>
             <tr style={{ color: "var(--sv-text-muted)", textAlign: "center" }}>
               {[

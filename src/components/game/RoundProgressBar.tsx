@@ -26,7 +26,7 @@ export function RoundProgressBar({
   if (variant === "nav") {
     return (
       <div
-        className="flex flex-col justify-center gap-1 min-w-0 w-full max-w-[200px] sm:max-w-[280px] md:max-w-[340px]"
+        className="flex flex-col justify-center gap-1 min-w-0 w-full max-w-none sm:max-w-[280px] md:max-w-[340px]"
         role="progressbar"
         aria-valuenow={completedRounds}
         aria-valuemin={0}

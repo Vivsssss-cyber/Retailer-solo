@@ -8,6 +8,7 @@ import {
   clampOrder,
   demandForRound,
   fingerprintFromConfig,
+  migrateGameConfig,
   normalizePipeline,
   supplyRateForRound,
   type Attempt,
@@ -60,12 +61,32 @@ function emptyStore(): StoreShape {
   return { heats: {}, attempts: {}, codes: {}, globalCompleted: [] };
 }
 
+function migrateStore(store: StoreShape): StoreShape {
+  let changed = false;
+  for (const heat of Object.values(store.heats)) {
+    const next = migrateGameConfig(heat.configuration);
+    if (next.maximum_order !== heat.configuration.maximum_order) {
+      heat.configuration = next;
+      changed = true;
+    }
+  }
+  for (const attempt of Object.values(store.attempts)) {
+    const next = migrateGameConfig(attempt.configuration);
+    if (next.maximum_order !== attempt.configuration.maximum_order) {
+      attempt.configuration = next;
+      changed = true;
+    }
+  }
+  if (changed) save(store);
+  return store;
+}
+
 function load(): StoreShape {
   if (typeof window === "undefined") return emptyStore();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return emptyStore();
-    return { ...emptyStore(), ...JSON.parse(raw) } as StoreShape;
+    return migrateStore({ ...emptyStore(), ...JSON.parse(raw) } as StoreShape);
   } catch {
     return emptyStore();
   }
@@ -89,7 +110,7 @@ function toPublicAttempt(a: MockAttempt): Attempt {
     attempt_id: a.attempt_id,
     heat_id: a.heat_id,
     player_name: a.player_name,
-    configuration: a.configuration,
+    configuration: migrateGameConfig(a.configuration),
     status: a.status,
     current_round: a.current_round,
     pipeline: a.pipeline,
@@ -161,7 +182,7 @@ function heatBoard(store: StoreShape, heatId: string, mode: "live" | "final"): L
 }
 
 function processOrder(attempt: Attempt, placedOrder: number): { attempt: Attempt; record: RoundRecord } {
-  const config = attempt.configuration;
+  const config = migrateGameConfig(attempt.configuration);
   const round = attempt.current_round;
   if (round > config.total_rounds) {
     throw new Error("Game already complete");
@@ -195,6 +216,7 @@ function processOrder(attempt: Attempt, placedOrder: number): { attempt: Attempt
 
   const next: Attempt = {
     ...attempt,
+    configuration: config,
     inventory: record.ending_inventory,
     backlog: record.ending_backlog,
     cumulative_cost: record.cumulative_cost,

@@ -1,0 +1,34 @@
+# Render Blueprint — Live Mode (single Node + persistent disk)
+# https://render.com/docs/blueprint-spec
+#
+# After connecting the repo: New → Blueprint → select this file
+# OR create a Web Service manually using the values in docs/DEPLOY.md
+#
+# HARD RULES:
+# - Instance count must stay 1 (file JSON store is not multi-instance)
+# - NEXT_PUBLIC_USE_MOCK must be "false" at build time
+# - Disk + DATA_DIR keep heats across redeploys
+
+services:
+  - type: web
+    name: retailer-challenge
+    runtime: node
+    plan: starter
+    region: oregon
+    branch: main
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/retailer-challenge/health
+    numInstances: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_PUBLIC_USE_MOCK
+        value: "false"
+      - key: DATA_DIR
+        value: /var/data
+      # Leave NEXT_PUBLIC_API_URL unset → same-origin /api/*
+    disk:
+      name: retailer-data
+      mountPath: /var/data
+      sizeGB: 1

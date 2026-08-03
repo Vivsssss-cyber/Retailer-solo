@@ -52,6 +52,7 @@ export default function BoxView({ data, gridCols = 2, dense = false }: BoxViewPr
       case 4:
         return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4";
       case 6:
+        // 2×3 on phones, 3×2 tablet, full strip on wide play shell
         return "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6";
       default:
         return "grid-cols-1 sm:grid-cols-2";

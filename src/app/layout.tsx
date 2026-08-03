@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
 
@@ -14,6 +14,13 @@ export const metadata: Metadata = {
     "Single-player supply-chain decision challenge — manage a retailer, balance inventory and backlog, beat the heat.",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#eff2f4",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -21,7 +28,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${outfit.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full min-h-dvh flex flex-col overflow-x-clip">
+        {children}
+      </body>
     </html>
   );
 }

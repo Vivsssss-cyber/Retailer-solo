@@ -3,7 +3,7 @@
  * New heats/attempts use this snapshot; engine tests still use DEFAULT_CONFIG.
  */
 
-import { DEFAULT_CONFIG, type GameConfig } from "@/engine";
+import { DEFAULT_CONFIG, migrateGameConfig, type GameConfig } from "@/engine";
 
 export const ADMIN_CONFIG_KEY = "retailer-challenge-admin-config-v1";
 export const ADMIN_SESSION_KEY = "retailer-challenge-admin-session";
@@ -21,7 +21,14 @@ export function loadAdminConfig(): GameConfig {
     const raw = localStorage.getItem(ADMIN_CONFIG_KEY);
     if (!raw) return cloneDefaultConfig();
     const parsed = JSON.parse(raw) as Partial<GameConfig>;
-    return normalizeGameConfig({ ...cloneDefaultConfig(), ...parsed });
+    const next = migrateGameConfig(
+      normalizeGameConfig({ ...cloneDefaultConfig(), ...parsed }),
+    );
+    // Persist migration so max order sticks after legacy 100 → 10000 bump
+    if (parsed.maximum_order === 100 && next.maximum_order !== 100) {
+      localStorage.setItem(ADMIN_CONFIG_KEY, JSON.stringify(next));
+    }
+    return next;
   } catch {
     return cloneDefaultConfig();
   }
@@ -68,29 +75,30 @@ export function lockAdmin() {
  * Align sequence lengths with total_rounds / delivery_delay and clamp values.
  */
 export function normalizeGameConfig(input: GameConfig): GameConfig {
-  const total = Math.min(15, Math.max(1, Math.floor(input.total_rounds) || 12));
-  const delay = Math.min(5, Math.max(1, Math.floor(input.delivery_delay) || 2));
+  const cfg = migrateGameConfig(input);
+  const total = Math.min(15, Math.max(1, Math.floor(cfg.total_rounds) || 12));
+  const delay = Math.min(5, Math.max(1, Math.floor(cfg.delivery_delay) || 2));
 
   const demand = padNumArray(
-    input.customer_demand_by_round,
+    cfg.customer_demand_by_round,
     total,
     4,
     (v) => Math.max(0, Math.floor(v)),
   );
   const supply = padNumArray(
-    input.supply_rate_by_round,
+    cfg.supply_rate_by_round,
     total,
     1,
     (v) => Math.min(1, Math.max(0, Number(v) || 0)),
   );
   const pipeline = padNumArray(
-    input.starting_pipeline_orders,
+    cfg.starting_pipeline_orders,
     delay,
     4,
     (v) => Math.max(0, Math.floor(v)),
   );
 
-  const panels = (input.info_panels ?? [])
+  const panels = (cfg.info_panels ?? [])
     .filter((p) => p && p.text?.trim())
     .map((p) => ({
       round: Math.min(total, Math.max(1, Math.floor(p.round) || 1)),
@@ -98,37 +106,37 @@ export function normalizeGameConfig(input: GameConfig): GameConfig {
     }));
 
   return {
-    ...input,
-    configuration_id: input.configuration_id?.trim() || DEFAULT_CONFIG.configuration_id,
-    configuration_version: Math.max(1, Math.floor(input.configuration_version) || 1),
-    demand_sequence_id: input.demand_sequence_id?.trim() || DEFAULT_CONFIG.demand_sequence_id,
-    supply_sequence_id: input.supply_sequence_id?.trim() || DEFAULT_CONFIG.supply_sequence_id,
-    game_name: input.game_name?.trim() || DEFAULT_CONFIG.game_name,
-    intro_text: input.intro_text ?? "",
-    timeline_unit: input.timeline_unit?.trim() || "Round",
+    ...cfg,
+    configuration_id: cfg.configuration_id?.trim() || DEFAULT_CONFIG.configuration_id,
+    configuration_version: Math.max(1, Math.floor(cfg.configuration_version) || 1),
+    demand_sequence_id: cfg.demand_sequence_id?.trim() || DEFAULT_CONFIG.demand_sequence_id,
+    supply_sequence_id: cfg.supply_sequence_id?.trim() || DEFAULT_CONFIG.supply_sequence_id,
+    game_name: cfg.game_name?.trim() || DEFAULT_CONFIG.game_name,
+    intro_text: cfg.intro_text ?? "",
+    timeline_unit: cfg.timeline_unit?.trim() || "Round",
     total_rounds: total,
     delivery_delay: delay,
-    starting_inventory: Math.max(0, Math.floor(input.starting_inventory) || 0),
-    starting_backlog: Math.max(0, Math.floor(input.starting_backlog) || 0),
+    starting_inventory: Math.max(0, Math.floor(cfg.starting_inventory) || 0),
+    starting_backlog: Math.max(0, Math.floor(cfg.starting_backlog) || 0),
     starting_pipeline_orders: pipeline,
     customer_demand_by_round: demand,
     supply_rate_by_round: supply,
-    inventory_cost_per_unit: Math.max(0, Number(input.inventory_cost_per_unit) || 0),
-    backlog_cost_per_unit: Math.max(0, Number(input.backlog_cost_per_unit) || 0),
-    minimum_order: Math.max(0, Math.floor(input.minimum_order) || 0),
+    inventory_cost_per_unit: Math.max(0, Number(cfg.inventory_cost_per_unit) || 0),
+    backlog_cost_per_unit: Math.max(0, Number(cfg.backlog_cost_per_unit) || 0),
+    minimum_order: Math.max(0, Math.floor(cfg.minimum_order) || 0),
     maximum_order: Math.max(
-      Math.floor(input.minimum_order) || 0,
-      Math.floor(input.maximum_order) || 100,
+      Math.floor(cfg.minimum_order) || 0,
+      Math.floor(cfg.maximum_order) || 10000,
     ),
     maximum_players_per_heat: Math.min(
       20,
-      Math.max(1, Math.floor(input.maximum_players_per_heat) || 4),
+      Math.max(1, Math.floor(cfg.maximum_players_per_heat) || 4),
     ),
-    leaderboard_enabled: !!input.leaderboard_enabled,
-    global_leaderboard_enabled: !!input.global_leaderboard_enabled,
-    animation_enabled: !!input.animation_enabled,
+    leaderboard_enabled: !!cfg.leaderboard_enabled,
+    global_leaderboard_enabled: !!cfg.global_leaderboard_enabled,
+    animation_enabled: !!cfg.animation_enabled,
     info_panels: panels,
-    partner_logo: input.partner_logo,
+    partner_logo: cfg.partner_logo,
   };
 }
 

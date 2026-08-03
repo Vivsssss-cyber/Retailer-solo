@@ -5,6 +5,7 @@ import {
   clampOrder,
   demandForRound,
   DEFAULT_CONFIG,
+  migrateGameConfig,
   normalizePipeline,
   supplyRateForRound,
   type Attempt,
@@ -33,7 +34,7 @@ function publicAttempt(a: ServerAttempt): Attempt {
     attempt_id: a.attempt_id,
     heat_id: a.heat_id,
     player_name: a.player_name,
-    configuration: a.configuration,
+    configuration: migrateGameConfig(a.configuration),
     status: a.status,
     current_round: a.current_round,
     pipeline: a.pipeline,
@@ -86,7 +87,7 @@ function processOrder(
   attempt: ServerAttempt,
   placedOrder: number,
 ): { attempt: ServerAttempt; record: RoundRecord } {
-  const config = attempt.configuration;
+  const config = migrateGameConfig(attempt.configuration);
   const round = attempt.current_round;
 
   if (attempt.status === "completed" || round > config.total_rounds) {
@@ -125,6 +126,7 @@ function processOrder(
 
   const next: ServerAttempt = {
     ...attempt,
+    configuration: config,
     inventory: record.ending_inventory,
     backlog: record.ending_backlog,
     cumulative_cost: record.cumulative_cost,

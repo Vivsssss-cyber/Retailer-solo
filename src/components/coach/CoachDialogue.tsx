@@ -32,30 +32,32 @@ export function CoachDialogue({
 }) {
   const [count, setCount] = useState(0);
   const [done, setDone] = useState(false);
-  const completedRef = useRef(false);
+  const [activeText, setActiveText] = useState(text);
+  /** Text for which onComplete already fired — avoids double-fire without render-time ref writes. */
+  const completedForTextRef = useRef<string | null>(null);
+
+  // Reset typewriter when the line changes (render-time state adjust — React-approved).
+  if (text !== activeText) {
+    setActiveText(text);
+    setCount(0);
+    setDone(false);
+  }
 
   const finish = useCallback(() => {
     setCount(text.length);
     setDone(true);
-    if (!completedRef.current) {
-      completedRef.current = true;
+    if (completedForTextRef.current !== text) {
+      completedForTextRef.current = text;
       onComplete?.();
     }
-  }, [text.length, onComplete]);
+  }, [text, onComplete]);
 
   useEffect(() => {
-    setCount(0);
-    setDone(false);
-    completedRef.current = false;
+    if (!text) return;
 
-    if (!text || prefersReducedMotion()) {
-      setCount(text.length);
-      setDone(true);
-      if (!completedRef.current) {
-        completedRef.current = true;
-        onComplete?.();
-      }
-      return;
+    if (prefersReducedMotion()) {
+      const id = window.setTimeout(() => finish(), 0);
+      return () => window.clearTimeout(id);
     }
 
     const intervalMs = Math.max(12, Math.round(1000 / cps));
@@ -64,19 +66,14 @@ export function CoachDialogue({
       i += 1;
       if (i >= text.length) {
         window.clearInterval(id);
-        setCount(text.length);
-        setDone(true);
-        if (!completedRef.current) {
-          completedRef.current = true;
-          onComplete?.();
-        }
+        finish();
         return;
       }
       setCount(i);
     }, intervalMs);
 
     return () => window.clearInterval(id);
-  }, [text, cps, onComplete]);
+  }, [text, cps, finish]);
 
   const displayed = text.slice(0, count);
 

@@ -121,13 +121,13 @@ export function TabBar({
             role="tab"
             aria-selected={isActive}
             onClick={() => onChange(tab.id)}
-            className="relative inline-flex items-center justify-center gap-1.5 rounded-full transition-colors duration-150"
+            className="relative inline-flex items-center justify-center gap-1.5 rounded-full transition-colors duration-150 min-h-9 sm:min-h-0 touch-manipulation"
             style={{
               fontFamily: "var(--sv-font-ui)",
               fontWeight: isActive ? 600 : 500,
               fontSize: 12,
               letterSpacing: "-0.01em",
-              padding: "5px 12px",
+              padding: "8px 12px",
               lineHeight: 1.2,
               color: isActive ? "var(--sv-ink)" : "var(--sv-text-muted)",
               background: isActive ? "var(--sv-card-solid, #fff)" : "transparent",

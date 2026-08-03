@@ -14,11 +14,20 @@ export function TrendPanel({
   dense?: boolean;
 }) {
   const [tab, setTab] = useState<"flow" | "cost">("flow");
-  const chartHeight = dense ? 148 : 240;
 
   const chartData = useMemo(() => {
     if (rounds.length === 0) {
-      return [{ name: "R0", Inventory: 0, Backlog: 0, Demand: 0, Orders: 0, Delivery: 0, "Total Cost": 0 }];
+      return [
+        {
+          name: "R0",
+          Inventory: 0,
+          Backlog: 0,
+          Demand: 0,
+          Orders: 0,
+          Delivery: 0,
+          "Total Cost": 0,
+        },
+      ];
     }
     return rounds.map((r) => ({
       name: `R${r.round}`,
@@ -31,6 +40,10 @@ export function TrendPanel({
     }));
   }, [rounds]);
 
+  /**
+   * Dense (play shell): fill parent via ResizeObserver — no fixed px trap.
+   * Standalone: fixed plot height for natural document flow.
+   */
   const graphical = useMemo(() => {
     if (tab === "flow") {
       return {
@@ -39,7 +52,9 @@ export function TrendPanel({
         xAxis: "Rounds",
         yAxis: ["Inventory", "Backlog", "Demand", "Orders", "Delivery"],
         chartData,
-        height: dense ? "100%" : chartHeight,
+        height: dense ? undefined : 240,
+        embedded: dense,
+        fill: dense,
       };
     }
     return {
@@ -48,16 +63,25 @@ export function TrendPanel({
       xAxis: "Rounds",
       yAxis: ["Total Cost"],
       chartData,
-      height: dense ? "100%" : chartHeight,
+      height: dense ? undefined : 240,
+      embedded: dense,
+      fill: dense,
     };
-  }, [tab, chartData, chartHeight, dense]);
+  }, [tab, chartData, dense]);
 
   return (
     <div
-      style={{ ...cardStyle, padding: dense ? 8 : 12, height: "100%", minHeight: 0 }}
-      className="flex flex-col min-h-0"
+      style={{
+        ...cardStyle,
+        padding: dense ? 8 : 12,
+        height: dense ? "100%" : undefined,
+        minHeight: dense ? 0 : undefined,
+      }}
+      className="flex flex-col min-h-0 min-w-0 w-full"
     >
-      <div className={`flex items-center justify-between gap-2 ${dense ? "mb-1" : "mb-2"} shrink-0`}>
+      <div
+        className={`flex items-center justify-between gap-2 ${dense ? "mb-1" : "mb-2"} shrink-0`}
+      >
         <span
           style={{
             fontFamily: FO,
@@ -77,7 +101,17 @@ export function TrendPanel({
           onChange={(id) => setTab(id as "flow" | "cost")}
         />
       </div>
-      <div className="min-h-0 flex-1">
+      {/*
+        Dense: flex-1 so GraphicalView can measure a real height on big screens.
+        Non-dense: natural height from fixed plot.
+      */}
+      <div
+        className={
+          dense
+            ? "flex-1 min-h-0 min-w-0 w-full"
+            : "w-full min-w-0 shrink-0"
+        }
+      >
         <GraphicalView data={graphical} />
       </div>
     </div>

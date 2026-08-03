@@ -13,20 +13,13 @@ import { RoundProgressBar } from "./RoundProgressBar";
 import type { Attempt } from "@/engine";
 
 /** Hydration-safe identity from localStorage (server snapshot is empty). */
-function usePlayerIdentity(): {
-  avatarSrc: string | null;
-  personaName: string | null;
-} {
+function usePlayerAvatarSrc(): string | null {
   const personaSlug = useSyncExternalStore(
     () => () => {},
     () => readPlayerProfile().persona,
     () => null,
   );
-  const persona = personaBySlug(personaSlug);
-  return {
-    avatarSrc: persona?.avatarSrc ?? null,
-    personaName: persona?.name ?? null,
-  };
+  return personaBySlug(personaSlug)?.avatarSrc ?? null;
 }
 
 export function GameHeader({
@@ -41,7 +34,7 @@ export function GameHeader({
   heatAccessCode?: string | null;
   onHowToPlayClick?: () => void;
 }) {
-  const { avatarSrc, personaName } = usePlayerIdentity();
+  const avatarSrc = usePlayerAvatarSrc();
   const costStr = attempt.cumulative_cost.toLocaleString();
   const config = attempt.configuration;
   const unit = config.timeline_unit || "Round";
@@ -52,18 +45,18 @@ export function GameHeader({
   return (
     <header className="sticky top-0 z-50 pointer-events-none">
       <div className="w-full mx-auto pointer-events-auto">
-        <div className="sv-frost-bar rounded-2xl flex items-center justify-between gap-2 sm:gap-3 px-2.5 sm:px-3 py-2 w-full border border-white isolate min-h-[56px]">
+        <div className="sv-frost-bar rounded-2xl flex flex-wrap items-center justify-between gap-x-2 gap-y-2 sm:gap-3 px-2 sm:px-3 py-2 w-full border border-white isolate min-h-[52px] sm:min-h-[56px]">
           {/* Left: brand + operator */}
-          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink-0">
-            <div className="flex items-center gap-2 shrink-0 pl-0.5">
-              <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-sv-lg flex items-center justify-center shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pl-0.5">
+              <span className="w-8 h-8 sm:w-10 sm:h-10 rounded-sv-lg flex items-center justify-center shrink-0">
                 <Image
                   src="/cyan-logo.svg"
                   alt="CYAN"
                   width={40}
                   height={40}
                   unoptimized
-                  className="w-9 h-9 sm:w-10 sm:h-10 object-contain"
+                  className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
                 />
               </span>
               <span className="hidden lg:flex flex-col justify-center leading-none">
@@ -81,49 +74,33 @@ export function GameHeader({
               aria-hidden
             />
 
-            {/* Operator — avatar sits free, no plate behind the character */}
-            <div className="flex items-center gap-2 min-w-0 px-0.5 sm:px-1">
-              <div className="w-10 h-10 shrink-0 flex items-center justify-center overflow-visible">
+            {/* Avatar + display name only — no persona tag (Scout, Analyst, …) */}
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 px-0.5 sm:px-1">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center overflow-visible">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={avatarSrc || PERSONA_AVATAR_PLACEHOLDER}
                   alt=""
-                  className="w-10 h-10 object-contain [image-rendering:pixelated]"
+                  className="w-8 h-8 sm:w-10 sm:h-10 object-contain [image-rendering:pixelated]"
                   style={{ background: "transparent" }}
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = PERSONA_AVATAR_PLACEHOLDER;
                   }}
                 />
               </div>
-              <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="text-[9px] font-bold uppercase tracking-[0.06em] text-sv-text-secondary leading-none">
-                  {personaName || "Operator"}
-                </span>
-                <span className="text-[13px] font-bold text-sv-ink truncate max-w-[72px] sm:max-w-[120px] leading-tight">
-                  {attempt.player_name}
-                </span>
-              </div>
+              <span className="hidden sm:block text-[13px] font-bold text-sv-ink truncate max-w-[72px] sm:max-w-[120px] leading-tight">
+                {attempt.player_name}
+              </span>
             </div>
           </div>
 
-          {/* Center: round progress */}
-          <div className="flex-1 flex justify-center min-w-0 px-1 sm:px-2">
-            <RoundProgressBar
-              variant="nav"
-              currentRound={currentRound}
-              totalRounds={totalRounds}
-              completedRounds={completedRounds}
-              unit={unit}
-            />
-          </div>
-
-          {/* Right: help + metrics */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          {/* Right: help + metrics — sit with brand row on mobile */}
+          <div className="flex items-center gap-1 sm:gap-2.5 shrink-0 order-2 sm:order-3">
             <GameButton
               onClick={onHowToPlayClick}
               size="sm"
               variant="secondary"
-              className="hidden md:inline-flex items-center gap-1.5 px-3 bg-white/60"
+              className="hidden md:inline-flex items-center gap-1.5 px-3 bg-white/60 min-h-9"
               aria-label="How to play"
             >
               <Info size={14} />
@@ -133,7 +110,7 @@ export function GameHeader({
               onClick={onHowToPlayClick}
               size="sm"
               variant="secondary"
-              className="md:hidden inline-flex items-center justify-center w-9 h-9 p-0 bg-white/60"
+              className="md:hidden inline-flex items-center justify-center w-10 h-10 p-0 bg-white/60"
               aria-label="How to play"
             >
               <Info size={14} />
@@ -144,15 +121,35 @@ export function GameHeader({
               aria-hidden
             />
 
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               {heatAccessCode && !heatAccessCode.startsWith("SOLO-") && (
-                <MetricPill label="Heat code" value={heatAccessCode} accent />
+                <MetricPill
+                  label="Heat"
+                  value={heatAccessCode}
+                  accent
+                  className="hidden sm:flex"
+                />
               )}
-              <MetricPill label="Cum. cost" value={`$${costStr}`} accent />
+              <MetricPill label="Cost" value={`$${costStr}`} accent />
               {livePosition != null && (
-                <MetricPill label="Live pos" value={`#${livePosition}`} />
+                <MetricPill
+                  label="Pos"
+                  value={`#${livePosition}`}
+                  className="hidden sm:flex"
+                />
               )}
             </div>
+          </div>
+
+          {/* Progress — full width under brand row on phones; centered on larger */}
+          <div className="w-full sm:w-auto sm:flex-1 flex justify-center min-w-0 px-0 sm:px-2 order-3 sm:order-2 basis-full sm:basis-auto">
+            <RoundProgressBar
+              variant="nav"
+              currentRound={currentRound}
+              totalRounds={totalRounds}
+              completedRounds={completedRounds}
+              unit={unit}
+            />
           </div>
         </div>
       </div>
@@ -164,24 +161,26 @@ function MetricPill({
   label,
   value,
   accent,
+  className = "",
 }: {
   label: string;
   value: string;
   accent?: boolean;
+  className?: string;
 }) {
   return (
     <div
-      className="flex flex-col gap-0.5 items-end justify-center rounded-xl px-2 sm:px-2.5 py-1.5 min-w-[64px] sm:min-w-[76px]"
+      className={`flex flex-col gap-0.5 items-end justify-center rounded-xl px-1.5 sm:px-2.5 py-1 sm:py-1.5 min-w-[52px] sm:min-w-[76px] ${className}`}
       style={{
         background: "rgba(255,255,255,0.55)",
         border: "1px solid color-mix(in srgb, var(--sv-border) 70%, white)",
       }}
     >
-      <span className="text-[9px] font-bold uppercase tracking-[0.06em] text-sv-text-secondary leading-none">
+      <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.06em] text-sv-text-secondary leading-none">
         {label}
       </span>
       <span
-        className={`text-[12px] sm:text-[13px] font-bold leading-tight sv-tabular ${
+        className={`text-[11px] sm:text-[13px] font-bold leading-tight sv-tabular ${
           accent ? "text-sv-teal-mid" : "text-sv-ink"
         }`}
       >

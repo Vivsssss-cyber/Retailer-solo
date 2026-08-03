@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Attempt, RoundRecord, UiPhase } from "@/engine";
 import { getRoundCoaching } from "@/lib/coaching";
 import { CoachOverlay, type CoachOverlayMessage } from "@/components/coach";
@@ -28,11 +28,16 @@ export function PlayCoachOverlay({
   lastRecord,
   completedRounds,
 }: PlayCoachOverlayProps) {
-  const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
+  const [dismissState, setDismissState] = useState(() => ({
+    attemptId: attempt.attempt_id,
+    ids: new Set<string>(),
+  }));
 
-  useEffect(() => {
-    setDismissed(new Set());
-  }, [attempt.attempt_id]);
+  // Derive dismissed set for the current attempt without an effect reset.
+  const dismissed =
+    dismissState.attemptId === attempt.attempt_id
+      ? dismissState.ids
+      : new Set<string>();
 
   const currentRound = attempt.current_round;
 
@@ -96,7 +101,14 @@ export function PlayCoachOverlay({
       message={active}
       onDismiss={() => {
         if (!active) return;
-        setDismissed((prev) => new Set(prev).add(active.id));
+        setDismissState((prev) => {
+          const base =
+            prev.attemptId === attempt.attempt_id ? prev.ids : new Set<string>();
+          return {
+            attemptId: attempt.attempt_id,
+            ids: new Set(base).add(active.id),
+          };
+        });
       }}
       holdMs={2200}
       fadeMs={450}

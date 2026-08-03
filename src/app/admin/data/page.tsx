@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { FO, GameButton, cardStyle } from "@/components/cyan";
 import { AdminShell, AdminSection, StatTile } from "@/components/admin/AdminShell";
 import {
@@ -28,75 +28,70 @@ interface AttemptRow {
   started_at: string;
 }
 
+function readMockRows(): { heats: HeatRow[]; attempts: AttemptRow[] } {
+  if (typeof window === "undefined") return { heats: [], attempts: [] };
+  try {
+    const raw = localStorage.getItem("retailer-challenge-v1");
+    if (!raw) return { heats: [], attempts: [] };
+    const store = JSON.parse(raw) as {
+      heats: Record<
+        string,
+        {
+          heat_id: string;
+          access_code: string;
+          created_at: string;
+          attempt_ids: string[];
+          configuration: { configuration_id: string; configuration_version: number };
+        }
+      >;
+      attempts: Record<
+        string,
+        {
+          attempt_id: string;
+          player_name: string;
+          heat_id: string;
+          status: string;
+          current_round: number;
+          cumulative_cost: number;
+          started_at: string;
+        }
+      >;
+    };
+    return {
+      heats: Object.values(store.heats ?? {}).map((h) => ({
+        heat_id: h.heat_id,
+        access_code: h.access_code,
+        created_at: h.created_at,
+        players: h.attempt_ids?.length ?? 0,
+        config_id: h.configuration?.configuration_id ?? "—",
+        version: h.configuration?.configuration_version ?? 0,
+      })),
+      attempts: Object.values(store.attempts ?? {}).map((a) => ({
+        attempt_id: a.attempt_id,
+        player_name: a.player_name,
+        heat_id: a.heat_id,
+        status: a.status,
+        round: a.current_round,
+        cost: a.cumulative_cost,
+        started_at: a.started_at,
+      })),
+    };
+  } catch {
+    return { heats: [], attempts: [] };
+  }
+}
+
 export default function AdminDataPage() {
-  const [stats, setStats] = useState(readMockStoreStats());
-  const [heats, setHeats] = useState<HeatRow[]>([]);
-  const [attempts, setAttempts] = useState<AttemptRow[]>([]);
+  const [stats, setStats] = useState(() => readMockStoreStats());
+  const [heats, setHeats] = useState<HeatRow[]>(() => readMockRows().heats);
+  const [attempts, setAttempts] = useState<AttemptRow[]>(() => readMockRows().attempts);
 
   const refresh = () => {
     setStats(readMockStoreStats());
-    if (typeof window === "undefined") return;
-    try {
-      const raw = localStorage.getItem("retailer-challenge-v1");
-      if (!raw) {
-        setHeats([]);
-        setAttempts([]);
-        return;
-      }
-      const store = JSON.parse(raw) as {
-        heats: Record<
-          string,
-          {
-            heat_id: string;
-            access_code: string;
-            created_at: string;
-            attempt_ids: string[];
-            configuration: { configuration_id: string; configuration_version: number };
-          }
-        >;
-        attempts: Record<
-          string,
-          {
-            attempt_id: string;
-            player_name: string;
-            heat_id: string;
-            status: string;
-            current_round: number;
-            cumulative_cost: number;
-            started_at: string;
-          }
-        >;
-      };
-      setHeats(
-        Object.values(store.heats ?? {}).map((h) => ({
-          heat_id: h.heat_id,
-          access_code: h.access_code,
-          created_at: h.created_at,
-          players: h.attempt_ids?.length ?? 0,
-          config_id: h.configuration?.configuration_id ?? "—",
-          version: h.configuration?.configuration_version ?? 0,
-        })),
-      );
-      setAttempts(
-        Object.values(store.attempts ?? {}).map((a) => ({
-          attempt_id: a.attempt_id,
-          player_name: a.player_name,
-          heat_id: a.heat_id,
-          status: a.status,
-          round: a.current_round,
-          cost: a.cumulative_cost,
-          started_at: a.started_at,
-        })),
-      );
-    } catch {
-      setHeats([]);
-      setAttempts([]);
-    }
+    const rows = readMockRows();
+    setHeats(rows.heats);
+    setAttempts(rows.attempts);
   };
-
-  useEffect(() => {
-    refresh();
-  }, []);
 
   return (
     <AdminShell

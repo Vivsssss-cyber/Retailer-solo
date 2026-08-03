@@ -9,7 +9,7 @@ import type {
   RoundRecord,
   UiPhase,
 } from "@/engine";
-import { calculateReport } from "@/engine";
+import { calculateReport, migrateGameConfig } from "@/engine";
 import { isHeatId, normalizeHeatKey } from "@/lib/heatKey";
 import { api } from "@/services/api";
 import { parseApiFailure } from "@/services/apiErrors";
@@ -91,7 +91,7 @@ const initial = {
   attempt: null as Attempt | null,
   opening: null as OpeningRoundView | null,
   lastRecord: null as RoundRecord | null,
-  orderInput: 4,
+  orderInput: 0,
   leaderboard: [] as LeaderboardRow[],
   globalBoard: [] as LeaderboardRow[],
   report: null as PerformanceReport | null,
@@ -103,6 +103,14 @@ const initial = {
   submitting: false,
   skipAnimation: false,
 };
+
+function withMigratedConfig(attempt: Attempt): Attempt {
+  const configuration = migrateGameConfig(attempt.configuration);
+  if (configuration.maximum_order === attempt.configuration.maximum_order) {
+    return attempt;
+  }
+  return { ...attempt, configuration };
+}
 
 function syncOpening(attempt: Attempt): OpeningRoundView | null {
   if (attempt.status === "completed") return null;
@@ -118,15 +126,17 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
       const heat = await api.createHeat({ solo: true, player_name: playerName });
       persistHeatCode(heat.access_code);
       // Prefer access code for attempt create — same path multiplayer join uses
-      const attempt = await api.createAttempt(heat.access_code || heat.heat_id, {
-        player_name: playerName,
-      });
+      const attempt = withMigratedConfig(
+        await api.createAttempt(heat.access_code || heat.heat_id, {
+          player_name: playerName,
+        }),
+      );
       const opening = syncOpening(attempt);
       set({
         attempt,
         opening,
         phase: "decide",
-        orderInput: opening?.customerDemand ?? 4,
+        orderInput: 0,
         heatAccessCode: heat.access_code,
         submitting: false,
       });
@@ -189,17 +199,19 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
         set({ error: err.message, submitting: false });
         throw err;
       }
-      const attempt = await api.createAttempt(key, {
-        player_name: playerName,
-        is_official: isOfficial || undefined,
-        player_identity: isOfficial ? identity : undefined,
-      });
+      const attempt = withMigratedConfig(
+        await api.createAttempt(key, {
+          player_name: playerName,
+          is_official: isOfficial || undefined,
+          player_identity: isOfficial ? identity : undefined,
+        }),
+      );
       const opening = syncOpening(attempt);
       set({
         attempt,
         opening,
         phase: "decide",
-        orderInput: opening?.customerDemand ?? 4,
+        orderInput: 0,
         heatAccessCode: get().heatAccessCode ?? readPersistedHeatCode(),
         submitting: false,
       });
@@ -215,11 +227,12 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
   async hydrate(attemptId: string) {
     set({ error: null, heatAccessCode: readPersistedHeatCode() });
     try {
-      const attempt = await api.getAttempt(attemptId);
-      if (!attempt) {
+      const raw = await api.getAttempt(attemptId);
+      if (!raw) {
         set({ error: "Attempt not found", phase: "intro" });
         return;
       }
+      const attempt = withMigratedConfig(raw);
       if (attempt.status === "completed") {
         const report = calculateReport(attempt.rounds);
         set({
@@ -238,7 +251,7 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
         attempt,
         opening,
         phase: "decide",
-        orderInput: opening?.customerDemand ?? 4,
+        orderInput: 0,
         heatAccessCode: readPersistedHeatCode(),
       });
       await get().refreshLeaderboards();
@@ -249,8 +262,10 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
   },
 
   setOrderInput(n: number) {
-    const max = get().attempt?.configuration.maximum_order ?? 100;
-    const min = get().attempt?.configuration.minimum_order ?? 0;
+    const cfg = get().attempt?.configuration;
+    const migrated = cfg ? migrateGameConfig(cfg) : null;
+    const max = migrated?.maximum_order ?? 10000;
+    const min = migrated?.minimum_order ?? 0;
     set({ orderInput: Math.min(max, Math.max(min, Math.floor(n) || 0)) });
   },
 
@@ -263,7 +278,7 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
         round: attempt.current_round,
         placed_order: orderInput,
       });
-      const next = res.attempt;
+      const next = withMigratedConfig(res.attempt);
 
       set({
         attempt: next,
@@ -292,7 +307,7 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
     set({
       phase: "decide",
       opening,
-      orderInput: opening?.customerDemand ?? get().orderInput,
+      orderInput: 0,
     });
     void get().refreshLeaderboards();
   },
@@ -344,14 +359,16 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
     const heatId = attempt.heat_id;
     set({ error: null, submitting: true });
     try {
-      const next = await api.createAttempt(heatId, { player_name: playerName });
+      const next = withMigratedConfig(
+        await api.createAttempt(heatId, { player_name: playerName }),
+      );
       const opening = syncOpening(next);
       set({
         attempt: next,
         opening,
         phase: "decide",
         lastRecord: null,
-        orderInput: opening?.customerDemand ?? 4,
+        orderInput: 0,
         report: null,
         heatRank: null,
         globalRank: null,
@@ -365,16 +382,18 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
       // Heat may be full — create a new solo heat instead
       try {
         const heat = await api.createHeat({ solo: true, player_name: playerName });
-        const next = await api.createAttempt(heat.heat_id, {
-          player_name: playerName,
-        });
+        const next = withMigratedConfig(
+          await api.createAttempt(heat.heat_id, {
+            player_name: playerName,
+          }),
+        );
         const opening = syncOpening(next);
         set({
           attempt: next,
           opening,
           phase: "decide",
           lastRecord: null,
-          orderInput: opening?.customerDemand ?? 4,
+          orderInput: 0,
           report: null,
           heatRank: null,
           globalRank: null,

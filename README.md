@@ -35,6 +35,14 @@ Open [http://localhost:3000](http://localhost:3000) → enter a name → **Solo 
 
 See `.env.example`. Never commit `.env.local`.
 
+## Deploy (Live Mode)
+
+For multiplayer heats on a public URL this week:
+
+→ **[`docs/DEPLOY.md`](./docs/DEPLOY.md)** — Render Starter + persistent disk (or Railway + volume).
+
+Blueprint: [`render.yaml`](./render.yaml). Requires `NEXT_PUBLIC_USE_MOCK=false` and **one** instance only.
+
 ## Architecture
 
 | Path | Role |

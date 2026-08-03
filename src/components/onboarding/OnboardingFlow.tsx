@@ -151,19 +151,18 @@ function WelcomeScreen({ onNext, config }: { onNext: () => void; config: GameCon
         <Image src="/cyan-logo.svg" alt="CYAN" width={64} height={64} unoptimized />
       </div>
       <h1
+        className="text-[clamp(1.35rem,5.2vw,2rem)] sm:text-[32px]"
         style={{
           fontFamily: FO,
           fontWeight: 800,
-          fontSize: 32,
           color: "var(--sv-ink)",
           marginBottom: 16,
-          lineHeight: 1.1,
+          lineHeight: 1.15,
           letterSpacing: "-0.5px",
+          whiteSpace: "nowrap",
         }}
       >
-        Master your
-        <br />
-        Supply Chain
+        Master your Supply Chain
       </h1>
       <p
         style={{
@@ -395,17 +394,6 @@ function IdentityScreen({
               className="truncate"
             >
               {name.trim()}
-            </p>
-            <p
-              style={{
-                fontFamily: FO,
-                fontSize: 11,
-                fontWeight: 600,
-                color: "var(--sv-text-secondary)",
-                margin: 0,
-              }}
-            >
-              {selected.name}
             </p>
           </div>
         </div>
@@ -1209,11 +1197,11 @@ export default function OnboardingFlow() {
         />
       </div>
 
-      <main className="mx-auto w-full max-w-[1040px] px-5 sm:px-8 py-10 sm:py-12 min-h-screen flex flex-col justify-center">
+      <main className="mx-auto w-full max-w-[1040px] px-4 sm:px-8 py-6 sm:py-12 min-h-dvh flex flex-col justify-center pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <div
           className={
             showCoach
-              ? "grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)] gap-8 lg:gap-6 items-center"
+              ? "grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)] gap-5 sm:gap-8 lg:gap-6 items-center"
               : "w-full"
           }
         >

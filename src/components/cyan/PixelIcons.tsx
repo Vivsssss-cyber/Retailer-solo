@@ -1,18 +1,19 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useSyncExternalStore } from "react";
 import type { StaticImageData } from "next/image";
 
 /** Beer-game subset of Streamline Pixel icons (from classic /demo/beer-game). */
 
+const subscribeNoop = () => () => {};
+
+function getCaptureMode(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("capture") === "1";
+}
+
 function useCaptureMode() {
-  const [capture, setCapture] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("capture") === "1") setCapture(true);
-  }, []);
-  return capture;
+  return useSyncExternalStore(subscribeNoop, getCaptureMode, () => false);
 }
 
 import packageIcon from "./icons/shopping-shipping-loading-box--Streamline-Pixel.svg";
