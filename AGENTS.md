@@ -44,6 +44,9 @@ docs/
   BACKEND_STATUS.md    # what is implemented vs next
   API_CONTRACT.md      # endpoint sheet
   DESIGN_SOURCE.md     # design provenance
+  DEPLOY.md            # Railway / Render / tunnel Live Mode
+public/
+  cyan-logo.svg, characters/*, images/intro/*, logos/*  # only referenced assets
 ```
 
 ---
@@ -115,7 +118,7 @@ Copy `.env.example` → `.env.local`:
 
 ---
 
-## Current state (2026-08-02)
+## Current state (2026-08-03)
 
 - Standalone Next app with Cyan UI + PixelIcons + logos  
 - PRD engine + unit tests (incl. full 12-round sim)  
@@ -146,11 +149,18 @@ Copy `.env.example` → `.env.local`:
 ### Live deploy path (this week)
 
 - **Preferred trial (no card):** Railway 30-day trial — `railway.toml` + volume at `/data`  
+- **Production URL (trial):** `https://retailer-challenge-production.up.railway.app/`  
 - **Alt paid:** Render Starter + disk — `render.yaml`  
 - **Local share:** Cloudflare Tunnel + `next start` (PC must stay on)  
 - **Runbook:** `docs/DEPLOY.md`  
 - **Required env:** `NEXT_PUBLIC_USE_MOCK=false`, `DATA_DIR=/data` (Railway) or `/var/data` (Render)  
 - **Do not** use Vercel until Postgres replaces the file store  
+
+### Housekeeping done (2026-08-03)
+
+- Purged unused Create-Next-App SVGs, orphan logos (space-name dupes / unused art), unused character stubs  
+- Removed unused components: `GameDock.tsx`, `InfoPanelBanner.tsx` (no importers)  
+- Confirmed `.data/` remains gitignored; `CLAUDE.md` → `@AGENTS.md` only
 
 
 ### Added from solo-beergame prototype (2026-08-02)
@@ -178,13 +188,22 @@ Copy `.env.example` → `.env.local`:
 
 ---
 
+## Housekeeping
+
+- **Canonical agent docs:** edit `AGENTS.md` only. `CLAUDE.md` is just `@AGENTS.md` — do not duplicate rules there.  
+- **Local DB file store:** `.data/` is gitignored (see `.gitignore`). Never force-add `retailer-challenge.json` or any `.data/*`.  
+- **Public assets:** only keep files referenced from `src/` (or intentional brand packs). Prefer `PixelIcons` over ad-hoc `public/logos/*` for new chrome.  
+- **Dead components:** do not leave unused game UI shells (e.g. docks/banners with no importers).  
+
 ## Anti-patterns
 
 - Do not import classic multiplayer `simulationStore` / WebSocket  
 - Do not add 4-role supply chain to this product  
 - Do not trust client costs/inventory when backend is on — server recomputes  
 - Do not invent random demand/supply for fair heats  
-- Do not commit `.env.local` or secrets  
+- Do not commit `.env.local`, secrets, or **`.data/`** store dumps  
+- Do not reintroduce Create-Next-App defaults (`public/next.svg`, `vercel.svg`, etc.)  
+- Do not add duplicate logo filenames with spaces (`total cost.svg`) when kebab-case is used in code
 
 ---
 

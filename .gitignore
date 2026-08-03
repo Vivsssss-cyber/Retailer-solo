@@ -68,8 +68,10 @@ tmp/
 temp/
 *.local
 
-# Backend file store (local/dev persistence)
+# Backend file store (local/dev/Railway volume dumps — never commit game DB JSON)
 .data/
+.data/**
+*.data.json
 
 # Optional Playwright / e2e artifacts (if added later)
 test-results/
