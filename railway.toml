@@ -1,0 +1,16 @@
+# Railway — Live Mode (single Node + volume)
+# https://docs.railway.com/reference/config-as-code
+#
+# Dashboard still required for: volume attach, public domain, env confirm.
+# HARD RULES: 1 replica only · mock off at build · DATA_DIR on a volume
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm install && npm run build"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/api/retailer-challenge/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

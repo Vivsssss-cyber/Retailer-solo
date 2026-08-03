@@ -39,9 +39,10 @@ See `.env.example`. Never commit `.env.local`.
 
 For multiplayer heats on a public URL this week:
 
-→ **[`docs/DEPLOY.md`](./docs/DEPLOY.md)** — Render Starter + persistent disk (or Railway + volume).
+→ **[`docs/DEPLOY.md`](./docs/DEPLOY.md)** — **Railway trial** (no card) or Render Starter + disk.
 
-Blueprint: [`render.yaml`](./render.yaml). Requires `NEXT_PUBLIC_USE_MOCK=false` and **one** instance only.
+Config: [`railway.toml`](./railway.toml) · [`render.yaml`](./render.yaml).  
+Requires `NEXT_PUBLIC_USE_MOCK=false`, a **volume**, and **one** instance only.
 
 ## Architecture
 

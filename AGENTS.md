@@ -145,10 +145,12 @@ Copy `.env.example` → `.env.local`:
 
 ### Live deploy path (this week)
 
-- **Host:** Render Starter (or Railway) — single Node web service + persistent disk  
-- **Runbook:** `docs/DEPLOY.md` · Blueprint: `render.yaml`  
-- **Required env:** `NEXT_PUBLIC_USE_MOCK=false`, `DATA_DIR=/var/data`  
-- **Do not** use free-tier sleepers for multiplayer heats; **do not** use Vercel until Postgres  
+- **Preferred trial (no card):** Railway 30-day trial — `railway.toml` + volume at `/data`  
+- **Alt paid:** Render Starter + disk — `render.yaml`  
+- **Local share:** Cloudflare Tunnel + `next start` (PC must stay on)  
+- **Runbook:** `docs/DEPLOY.md`  
+- **Required env:** `NEXT_PUBLIC_USE_MOCK=false`, `DATA_DIR=/data` (Railway) or `/var/data` (Render)  
+- **Do not** use Vercel until Postgres replaces the file store  
 
 
 ### Added from solo-beergame prototype (2026-08-02)

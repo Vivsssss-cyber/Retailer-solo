@@ -1,4 +1,4 @@
-# Deploy — Live Mode (Render Starter + disk)
+# Deploy — Live Mode (Railway trial / Render / tunnel)
 
 > Goal: share a public URL this week so **multiplayer heats work across phones**.  
 > Architecture: one Next.js process + file store on a **persistent disk**.
@@ -14,14 +14,73 @@ Do **not** deploy to Vercel until the JSON file store is replaced with Postgres
 |---|---|
 | Live API (not browser mock) | `NEXT_PUBLIC_USE_MOCK=false` |
 | Shared heats across devices | Same public origin; API on same app |
-| Survive redeploys | Persistent disk + `DATA_DIR=/var/data` |
+| Survive redeploys | Persistent volume + `DATA_DIR` |
 | Correct store model | **1 instance only** (never scale out) |
 
 State file: `${DATA_DIR}/retailer-challenge.json` (default local: `./.data/…`).
 
 ---
 
-## Phase 0 — Local gate (before Render)
+## Recommended this week: Railway (30-day trial, no card)
+
+Railway trial (as of 2026): **~$5 credit for 30 days, no credit card** for many signups  
+(GitHub login). After trial, Free plan is only ~$1/mo credit — often **not enough** for 24/7.
+
+Config in repo: [`railway.toml`](../railway.toml).
+
+### Steps
+
+1. Open [railway.com](https://railway.com) → **Login with GitHub** (`Vivsssss-cyber`).
+2. **New Project** → **Deploy from GitHub repo** → **`Retailer-solo`** (branch `main`).
+3. If the repo is missing: GitHub → Settings → Applications → Railway → allow **`Retailer-solo`**.
+4. Railway will detect Node/Next. Confirm:
+   - **Build:** `npm install && npm run build` (from `railway.toml`)
+   - **Start:** `npm start`
+5. **Variables** (Settings → Variables) — set **before** first successful build if possible:
+
+| Key | Value |
+|---|---|
+| `NEXT_PUBLIC_USE_MOCK` | `false` |
+| `DATA_DIR` | `/data` |
+
+   Mark `NEXT_PUBLIC_USE_MOCK` as available at **build time** (Railway: shared / build env).  
+   Leave `NEXT_PUBLIC_API_URL` unset (same-origin API).  
+   Railway sets `PORT` automatically — do not hardcode it.
+
+6. **Volume** (important for heats surviving restarts):
+   - Service → **Volumes** → Add volume  
+   - Mount path: **`/data`**  
+   - Size: 0.5–1 GB is enough  
+
+7. **Networking** → **Generate domain** (e.g. `something.up.railway.app`).
+
+8. Wait for deploy → open the public URL.
+
+### Verify
+
+```bash
+# PowerShell
+$env:BASE_URL="https://YOUR-APP.up.railway.app"
+curl "$env:BASE_URL/api/retailer-challenge/health"
+# → {"ok":true,"service":"retailer-challenge"}
+
+npm run smoke:api
+```
+
+Browser: host heat on laptop → join from phone on the **same** Railway URL.
+
+### Trial tips
+
+| Tip | Why |
+|---|---|
+| One service only | Saves credit |
+| Attach volume | Without it, redeploys wipe heats |
+| Watch usage | $5 can run out before 30 days if always-on |
+| Redeploy after env change | `NEXT_PUBLIC_*` is baked at build |
+
+---
+
+## Phase 0 — Local gate (before any host)
 
 ```bash
 # .env.local
@@ -111,13 +170,9 @@ Browser checklist:
 
 ---
 
-## Railway alternative (same architecture)
+## Render (needs card for Starter)
 
-1. New project → deploy from GitHub.  
-2. Start: `npm start` · Build: `npm install && npm run build`.  
-3. Attach a **volume** at `/var/data`.  
-4. Env: `NEXT_PUBLIC_USE_MOCK=false`, `DATA_DIR=/var/data`, Node 22.  
-5. Same health + `smoke:api` checks.
+See earlier plan: Web Service + disk at `/var/data`. Free tier sleeps — avoid for multiplayer heats.
 
 ---
 
