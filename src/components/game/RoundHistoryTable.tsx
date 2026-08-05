@@ -87,48 +87,67 @@ export function RoundHistoryTable({
             </tr>
           </thead>
           <tbody>
-            {rounds.map((r) => (
-              <tr
-                key={r.round}
-                style={{
-                  textAlign: "center",
-                  color: "var(--sv-ink)",
-                  borderBottom: "1px solid rgba(200,221,230,0.5)",
-                }}
-              >
-                <td className="sv-tabular" style={{ padding: "6px 8px", fontWeight: 700 }}>
-                  {r.round}
-                </td>
-                <td className="sv-tabular" style={{ padding: "6px 8px" }}>
-                  {r.ending_inventory}
-                </td>
-                <td className="sv-tabular" style={{ padding: "6px 8px" }}>
-                  {r.incoming_delivery}
-                </td>
-                <td
-                  className="sv-tabular"
+            {rounds.map((r, i) => {
+              const isLatest = i === rounds.length - 1;
+              return (
+                <tr
+                  key={r.round}
+                  className={[
+                    "sv-table-row",
+                    isLatest ? "sv-row-new" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                   style={{
-                    padding: "6px 8px",
-                    color: r.ending_backlog > 0 ? "var(--sv-negative)" : "var(--sv-ink)",
-                    fontWeight: r.ending_backlog > 0 ? 700 : 500,
+                    textAlign: "center",
+                    color: "var(--sv-ink)",
+                    borderBottom: "1px solid rgba(200,221,230,0.5)",
+                    fontWeight: isLatest ? 600 : 500,
                   }}
                 >
-                  {r.ending_backlog}
-                </td>
-                <td className="sv-tabular" style={{ padding: "6px 8px" }}>
-                  {r.customer_demand}
-                </td>
-                <td className="sv-tabular" style={{ padding: "6px 8px" }}>
-                  {r.placed_order}
-                </td>
-                <td className="sv-tabular" style={{ padding: "6px 8px" }}>
-                  ${r.round_cost.toLocaleString()}
-                </td>
-                <td className="sv-tabular" style={{ padding: "6px 8px", fontWeight: 700 }}>
-                  ${r.cumulative_cost.toLocaleString()}
-                </td>
-              </tr>
-            ))}
+                  <td
+                    className="sv-tabular"
+                    style={{ padding: "6px 8px", fontWeight: 700 }}
+                  >
+                    {r.round}
+                  </td>
+                  <td className="sv-tabular" style={{ padding: "6px 8px" }}>
+                    {r.ending_inventory}
+                  </td>
+                  <td className="sv-tabular" style={{ padding: "6px 8px" }}>
+                    {r.incoming_delivery}
+                  </td>
+                  <td
+                    className="sv-tabular"
+                    style={{
+                      padding: "6px 8px",
+                      color:
+                        r.ending_backlog > 0
+                          ? "var(--sv-negative)"
+                          : "var(--sv-ink)",
+                      fontWeight: r.ending_backlog > 0 ? 700 : 500,
+                    }}
+                  >
+                    {r.ending_backlog}
+                  </td>
+                  <td className="sv-tabular" style={{ padding: "6px 8px" }}>
+                    {r.customer_demand}
+                  </td>
+                  <td className="sv-tabular" style={{ padding: "6px 8px" }}>
+                    {r.placed_order}
+                  </td>
+                  <td className="sv-tabular" style={{ padding: "6px 8px" }}>
+                    ${r.round_cost.toLocaleString()}
+                  </td>
+                  <td
+                    className="sv-tabular"
+                    style={{ padding: "6px 8px", fontWeight: 700 }}
+                  >
+                    ${r.cumulative_cost.toLocaleString()}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

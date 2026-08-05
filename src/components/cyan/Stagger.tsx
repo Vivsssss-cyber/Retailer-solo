@@ -62,11 +62,18 @@ export function StaggerItem({
       className={className}
       style={style}
       variants={{
-        hidden: { opacity: 0, y },
+        // Full transform string = hardware-accelerated path
+        hidden: {
+          opacity: 0,
+          transform: `translateY(${y}px) scale(0.98)`,
+        },
         show: {
           opacity: 1,
-          y: 0,
-          transition: { type: "spring", stiffness: 120, damping: 25 },
+          transform: "translateY(0px) scale(1)",
+          transition: {
+            duration: 0.28,
+            ease: [0.23, 1, 0.32, 1],
+          },
         },
       }}
     >
@@ -86,8 +93,12 @@ export function HoverLift({
 }) {
   return (
     <div
-      className={`transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${className ?? ""}`}
-      style={style}
+      className={`sv-surface ${className ?? ""}`}
+      style={{
+        transition:
+          "transform 200ms var(--sv-ease-out, cubic-bezier(0.23,1,0.32,1)), box-shadow 200ms ease",
+        ...style,
+      }}
     >
       {children}
     </div>

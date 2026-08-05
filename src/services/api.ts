@@ -97,6 +97,25 @@ const liveApi: RetailerChallengeApi = {
     request(
       `/events/default/global-leaderboard?configuration_id=${encodeURIComponent(configurationId)}`,
     ),
+  getAdminData: () =>
+    request(`/admin/data`, {
+      headers: { "X-Admin-Pin": ADMIN_PIN },
+    }),
+  clearAdminData: () =>
+    request(`/admin/clear`, {
+      method: "POST",
+      headers: { "X-Admin-Pin": ADMIN_PIN },
+    }),
+  toggleHeatStatus: (heatId) =>
+    request(`/admin/heats/${encodeURIComponent(heatId)}`, {
+      method: "POST",
+      headers: { "X-Admin-Pin": ADMIN_PIN },
+    }),
+  deleteHeat: (heatId) =>
+    request(`/admin/heats/${encodeURIComponent(heatId)}`, {
+      method: "DELETE",
+      headers: { "X-Admin-Pin": ADMIN_PIN },
+    }),
 };
 
 export const api: RetailerChallengeApi = USE_MOCK ? mockAdapter : liveApi;

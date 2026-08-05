@@ -2,6 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { FO, GameButton } from "@/components/cyan";
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { CoachSpeech } from "@/components/coach/CoachSpeech";
 import type { GameConfig } from "@/engine";
 import {
   cloneDefaultConfig,
@@ -417,6 +428,16 @@ export function SequencesSection({
   const [demandMin, setDemandMin] = useState(2);
   const [demandMax, setDemandMax] = useState(12);
 
+  // Cyclical preset states
+  const [amplitude, setAmplitude] = useState(3);
+  const [period, setPeriod] = useState(8);
+  const [baseline, setBaseline] = useState(6);
+
+  // Disruption preset states
+  const [disruptAt, setDisruptAt] = useState(5);
+  const [disruptTo, setDisruptTo] = useState(0.2);
+  const [recovery, setRecovery] = useState(3);
+
   const fillDemand = (value: number) => {
     update({
       customer_demand_by_round: Array.from({ length: config.total_rounds }, () => value),
@@ -431,7 +452,6 @@ export function SequencesSection({
     });
   };
 
-  /** Assign every round a random integer in [min, max] inclusive. */
   const randomDemand = (min: number, max: number) => {
     const lo = Math.min(min, max);
     const hi = Math.max(min, max);
@@ -444,14 +464,73 @@ export function SequencesSection({
     });
   };
 
+  const cyclicalDemand = (amp: number, per: number, base: number) => {
+    update({
+      customer_demand_by_round: Array.from({ length: config.total_rounds }, (_, i) =>
+        Math.max(0, Math.round(base + amp * Math.sin((2 * Math.PI * i) / per))),
+      ),
+    });
+  };
+
   const fillSupply = (rate: number) => {
     update({
       supply_rate_by_round: Array.from({ length: config.total_rounds }, () => rate),
     });
   };
 
+  const supplyDisruption = (dropAt: number, dropTo: number, recoveryRounds: number) => {
+    const rates = Array.from({ length: config.total_rounds }, (_, i) => {
+      const roundNum = i + 1;
+      if (roundNum < dropAt) return 1;
+      if (roundNum === dropAt) return dropTo;
+      const diff = roundNum - dropAt;
+      if (diff >= recoveryRounds) return 1;
+      const fraction = diff / recoveryRounds;
+      const val = dropTo + (1 - dropTo) * fraction;
+      return parseFloat(val.toFixed(2));
+    });
+    update({ supply_rate_by_round: rates });
+  };
+
+  // Recharts data formatting
+  const chartData = config.customer_demand_by_round.map((demand, index) => ({
+    roundNum: index + 1,
+    roundLabel: `R${index + 1}`,
+    demand,
+    supplyRate: Math.round((config.supply_rate_by_round[index] ?? 1) * 100),
+  }));
+
   return (
     <>
+      <AdminSection
+        title="Sequence visualizer"
+        subtitle="Live graph showing Customer Demand vs Supply Fulfillment Rate."
+      >
+        <div
+          style={{
+            background: "rgba(255,255,255,0.4)",
+            border: "1.4px solid white",
+            borderRadius: 16,
+            padding: 16,
+            height: 240,
+            width: "100%",
+          }}
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+              <XAxis dataKey="roundLabel" style={{ fontSize: 10, fontFamily: FO, fontWeight: 700 }} stroke="var(--sv-text-muted)" />
+              <YAxis yAxisId="left" style={{ fontSize: 10, fontFamily: FO }} stroke="var(--sv-teal-mid)" label={{ value: 'Demand (units)', angle: -90, position: 'insideLeft', offset: 0, style: { fontSize: 10, fontFamily: FO, fontWeight: 700 } }} />
+              <YAxis yAxisId="right" orientation="right" style={{ fontSize: 10, fontFamily: FO }} stroke="#f43f5e" label={{ value: 'Supply Rate (%)', angle: 90, position: 'insideRight', offset: 0, style: { fontSize: 10, fontFamily: FO, fontWeight: 700 } }} domain={[0, 100]} />
+              <Tooltip contentStyle={{ fontFamily: FO, fontSize: 11, borderRadius: 8, border: "1.4px solid white" }} />
+              <Legend wrapperStyle={{ fontFamily: FO, fontSize: 11, fontWeight: 600 }} />
+              <Line yAxisId="left" type="monotone" dataKey="demand" name="Customer Demand" stroke="var(--sv-teal-mid)" strokeWidth={2.5} activeDot={{ r: 6 }} />
+              <Line yAxisId="right" type="monotone" dataKey="supplyRate" name="Supply Rate (%)" stroke="#f43f5e" strokeWidth={2} strokeDasharray="4 4" activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </AdminSection>
+
       <AdminSection
         title="Customer demand by round"
         subtitle="Same sequence for every player in a heat (fairness). Edit cells or use generators."
@@ -470,67 +549,107 @@ export function SequencesSection({
           </GameButton>
         </div>
 
-        {/* Random A–B generator */}
-        <div
-          className="flex flex-wrap items-end gap-3 mb-4"
-          style={{
-            background: "rgba(255,255,255,0.5)",
-            border: "1.4px solid white",
-            borderRadius: 14,
-            padding: 12,
-          }}
-        >
-          <div style={{ flex: "1 1 100%" }}>
-            <p
-              style={{
-                fontFamily: FO,
-                fontSize: 12,
-                fontWeight: 700,
-                color: "var(--sv-ink)",
-                marginBottom: 2,
-              }}
-            >
-              Random demand generator
-            </p>
-            <p style={{ fontFamily: FO, fontSize: 11, color: "var(--sv-text-muted)" }}>
-              Assigns each of the {config.total_rounds} rounds a random integer between A and B
-              (inclusive).
-            </p>
-          </div>
-          <Field label="From (A)">
-            <input
-              type="number"
-              min={0}
-              style={{ ...adminInputStyle, width: 88 }}
-              value={demandMin}
-              onChange={(e) => setDemandMin(parseInt(e.target.value, 10) || 0)}
-            />
-          </Field>
-          <Field label="To (B)">
-            <input
-              type="number"
-              min={0}
-              style={{ ...adminInputStyle, width: 88 }}
-              value={demandMax}
-              onChange={(e) => setDemandMax(parseInt(e.target.value, 10) || 0)}
-            />
-          </Field>
-          <GameButton
-            type="button"
-            size="sm"
-            onClick={() => randomDemand(demandMin, demandMax)}
+        {/* Demand generators grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          {/* Random demand generator */}
+          <div
+            style={{
+              background: "rgba(255,255,255,0.5)",
+              border: "1.4px solid white",
+              borderRadius: 14,
+              padding: 12,
+            }}
           >
-            Randomize all rounds
-          </GameButton>
+            <p style={{ fontFamily: FO, fontSize: 12, fontWeight: 700, color: "var(--sv-ink)", marginBottom: 4 }}>
+              Random Demand
+            </p>
+            <div className="flex flex-wrap items-end gap-2">
+              <Field label="Min (A)">
+                <input
+                  type="number"
+                  min={0}
+                  style={{ ...adminInputStyle, width: 70, padding: "6px 8px" }}
+                  value={demandMin}
+                  onChange={(e) => setDemandMin(parseInt(e.target.value, 10) || 0)}
+                />
+              </Field>
+              <Field label="Max (B)">
+                <input
+                  type="number"
+                  min={0}
+                  style={{ ...adminInputStyle, width: 70, padding: "6px 8px" }}
+                  value={demandMax}
+                  onChange={(e) => setDemandMax(parseInt(e.target.value, 10) || 0)}
+                />
+              </Field>
+              <GameButton
+                type="button"
+                size="sm"
+                onClick={() => randomDemand(demandMin, demandMax)}
+              >
+                Generate
+              </GameButton>
+            </div>
+          </div>
+
+          {/* Cyclical seasonal sine-wave generator */}
+          <div
+            style={{
+              background: "rgba(255,255,255,0.5)",
+              border: "1.4px solid white",
+              borderRadius: 14,
+              padding: 12,
+            }}
+          >
+            <p style={{ fontFamily: FO, fontSize: 12, fontWeight: 700, color: "var(--sv-ink)", marginBottom: 4 }}>
+              Cyclical Sine-Wave Demand
+            </p>
+            <div className="flex flex-wrap items-end gap-2">
+              <Field label="Amp">
+                <input
+                  type="number"
+                  min={1}
+                  style={{ ...adminInputStyle, width: 56, padding: "6px 8px" }}
+                  value={amplitude}
+                  onChange={(e) => setAmplitude(parseInt(e.target.value, 10) || 1)}
+                />
+              </Field>
+              <Field label="Period">
+                <input
+                  type="number"
+                  min={2}
+                  style={{ ...adminInputStyle, width: 56, padding: "6px 8px" }}
+                  value={period}
+                  onChange={(e) => setPeriod(parseInt(e.target.value, 10) || 2)}
+                />
+              </Field>
+              <Field label="Base">
+                <input
+                  type="number"
+                  min={0}
+                  style={{ ...adminInputStyle, width: 56, padding: "6px 8px" }}
+                  value={baseline}
+                  onChange={(e) => setBaseline(parseInt(e.target.value, 10) || 0)}
+                />
+              </Field>
+              <GameButton
+                type="button"
+                size="sm"
+                onClick={() => cyclicalDemand(amplitude, period, baseline)}
+              >
+                Generate
+              </GameButton>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
           {config.customer_demand_by_round.map((v, i) => (
             <Field key={i} label={`R${i + 1}`}>
               <input
                 type="number"
                 min={0}
-                style={adminInputStyle}
+                style={{ ...adminInputStyle, padding: "8px" }}
                 value={v}
                 onChange={(e) => {
                   const next = [...config.customer_demand_by_round];
@@ -566,7 +685,63 @@ export function SequencesSection({
             Mild disruptions
           </GameButton>
         </div>
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+
+        {/* Disruption drop generator */}
+        <div
+          style={{
+            background: "rgba(255,255,255,0.5)",
+            border: "1.4px solid white",
+            borderRadius: 14,
+            padding: 12,
+            marginBottom: 16,
+          }}
+          className="max-w-xl"
+        >
+          <p style={{ fontFamily: FO, fontSize: 12, fontWeight: 700, color: "var(--sv-ink)", marginBottom: 4 }}>
+            Disruption Generator
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <Field label="Drop At Round" hint="e.g. R5">
+              <input
+                type="number"
+                min={1}
+                max={config.total_rounds}
+                style={{ ...adminInputStyle, width: 80, padding: "6px 8px" }}
+                value={disruptAt}
+                onChange={(e) => setDisruptAt(parseInt(e.target.value, 10) || 1)}
+              />
+            </Field>
+            <Field label="Drop Rate (0-1)" hint="e.g. 0.2">
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step={0.1}
+                style={{ ...adminInputStyle, width: 90, padding: "6px 8px" }}
+                value={disruptTo}
+                onChange={(e) => setDisruptTo(parseFloat(e.target.value) || 0)}
+              />
+            </Field>
+            <Field label="Recovery (Rounds)" hint="linear recovery">
+              <input
+                type="number"
+                min={1}
+                style={{ ...adminInputStyle, width: 90, padding: "6px 8px" }}
+                value={recovery}
+                onChange={(e) => setRecovery(parseInt(e.target.value, 10) || 1)}
+              />
+            </Field>
+            <GameButton
+              type="button"
+              size="sm"
+              onClick={() => supplyDisruption(disruptAt, disruptTo, recovery)}
+            >
+              Generate disruption
+            </GameButton>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
           {config.supply_rate_by_round.map((v, i) => (
             <Field key={i} label={`R${i + 1}`}>
               <input
@@ -574,7 +749,7 @@ export function SequencesSection({
                 min={0}
                 max={1}
                 step={0.05}
-                style={adminInputStyle}
+                style={{ ...adminInputStyle, padding: "8px" }}
                 value={v}
                 onChange={(e) => {
                   const next = [...config.supply_rate_by_round];
@@ -598,63 +773,129 @@ export function InfoPanelsSection({
   update: (p: Partial<GameConfig>) => void;
 }) {
   const panels = config.info_panels ?? [];
+  const [previewIndex, setPreviewIndex] = useState<number>(0);
+
+  const selectedPanel = panels[previewIndex] ?? panels[0];
 
   return (
     <AdminSection
       title="Coaching / info panels"
-      subtitle="Optional banners shown at the start of a given round."
+      subtitle="Optional banners shown at the start of a given round. Gated to maximum rounds."
     >
-      {panels.map((p, i) => (
-        <div key={i} className="grid grid-cols-1 sm:grid-cols-[100px_1fr_auto] gap-2 mb-2">
-          <Field label="Round">
-            <input
-              type="number"
-              min={1}
-              max={config.total_rounds}
-              style={adminInputStyle}
-              value={p.round}
-              onChange={(e) => {
-                const next = [...panels];
-                next[i] = { ...next[i], round: parseInt(e.target.value, 10) || 1 };
-                update({ info_panels: next });
-              }}
-            />
-          </Field>
-          <Field label="Text">
-            <input
-              style={adminInputStyle}
-              value={p.text}
-              onChange={(e) => {
-                const next = [...panels];
-                next[i] = { ...next[i], text: e.target.value };
-                update({ info_panels: next });
-              }}
-            />
-          </Field>
-          <div className="flex items-end">
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] gap-4">
+        <div>
+          {panels.map((p, i) => (
+            <div key={i} className="grid grid-cols-1 sm:grid-cols-[100px_1fr_auto] gap-2 mb-2">
+              <Field label="Round">
+                <input
+                  type="number"
+                  min={1}
+                  max={config.total_rounds}
+                  style={adminInputStyle}
+                  value={p.round}
+                  onChange={(e) => {
+                    const next = [...panels];
+                    const r = Math.min(config.total_rounds, Math.max(1, parseInt(e.target.value, 10) || 1));
+                    next[i] = { ...next[i], round: r };
+                    update({ info_panels: next });
+                  }}
+                />
+              </Field>
+              <Field label="Text">
+                <input
+                  style={adminInputStyle}
+                  value={p.text}
+                  onChange={(e) => {
+                    const next = [...panels];
+                    next[i] = { ...next[i], text: e.target.value };
+                    update({ info_panels: next });
+                  }}
+                />
+              </Field>
+              <div className="flex items-end gap-1">
+                <GameButton
+                  type="button"
+                  size="sm"
+                  variant={previewIndex === i ? "secondary" : "outline"}
+                  onClick={() => setPreviewIndex(i)}
+                >
+                  Preview
+                </GameButton>
+                <GameButton
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    update({ info_panels: panels.filter((_, j) => j !== i) });
+                    if (previewIndex >= panels.length - 1) {
+                      setPreviewIndex(Math.max(0, panels.length - 2));
+                    }
+                  }}
+                >
+                  Remove
+                </GameButton>
+              </div>
+            </div>
+          ))}
+          <div className="mt-3">
             <GameButton
               type="button"
               size="sm"
-              variant="ghost"
-              onClick={() => update({ info_panels: panels.filter((_, j) => j !== i) })}
+              variant="secondary"
+              onClick={() => {
+                const nextRound = panels.length > 0 ? Math.min(config.total_rounds, panels[panels.length - 1].round + 1) : 1;
+                update({
+                  info_panels: [...panels, { round: nextRound, text: "New coaching tip…" }],
+                });
+                setPreviewIndex(panels.length);
+              }}
             >
-              Remove
+              Add panel
             </GameButton>
           </div>
         </div>
-      ))}
-      <GameButton
-        type="button"
-        size="sm"
-        variant="secondary"
-        onClick={() =>
-          update({
-            info_panels: [...panels, { round: 1, text: "New coaching tip…" }],
-          })
-        }
-      >
-        Add panel
-      </GameButton>
+
+        {/* Live RPG Speech Bubble Preview */}
+        <div
+          style={{
+            background: "rgba(255,255,255,0.45)",
+            border: "1.4px solid white",
+            borderRadius: 16,
+            padding: 14,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: FO,
+              fontSize: 10,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              color: "var(--sv-text-muted)",
+              marginBottom: 8,
+            }}
+          >
+            Live RPG coach preview
+          </p>
+          {selectedPanel ? (
+            <div className="flex-1 flex items-center justify-center p-3 bg-[var(--sv-card)] rounded-xl border border-white/50 overflow-hidden min-h-[140px]">
+              <div className="w-full">
+                <CoachSpeech
+                  line={selectedPanel.text}
+                  messageKey={`${previewIndex}-${selectedPanel.text}-${selectedPanel.round}`}
+                  tone="tip"
+                  size="md"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center p-3 bg-[var(--sv-card)] rounded-xl border border-white/50 text-xs text-[var(--sv-text-muted)] font-semibold text-center">
+              Add a coaching tip or click &quot;Preview&quot; to inspect a panel.
+            </div>
+          )}
+        </div>
+      </div>
     </AdminSection>
   );
 }

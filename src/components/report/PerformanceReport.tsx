@@ -304,7 +304,14 @@ export function PerformanceReportView({
                 className="mb-4 p-3 rounded-xl flex flex-wrap items-center justify-between gap-2"
                 style={{
                   background: "var(--sv-cyan-tint)",
-                  border: "1.4px solid white",
+                  border:
+                    leader.player_name === attempt.player_name
+                      ? "1.6px solid var(--sv-teal-mid)"
+                      : "1.4px solid white",
+                  boxShadow:
+                    leader.player_name === attempt.player_name
+                      ? "var(--sv-shadow-3)"
+                      : undefined,
                 }}
               >
                 <div>
@@ -318,9 +325,20 @@ export function PerformanceReportView({
                       letterSpacing: "0.06em",
                     }}
                   >
-                    Heat leader
+                    {leader.player_name === attempt.player_name
+                      ? "You won the heat"
+                      : "Heat leader"}
                   </div>
-                  <div style={{ fontFamily: FO, fontWeight: 800, fontSize: 18, color: "var(--sv-ink)" }}>
+                  <div
+                    className="flex items-center gap-2"
+                    style={{
+                      fontFamily: FO,
+                      fontWeight: 800,
+                      fontSize: 18,
+                      color: "var(--sv-ink)",
+                    }}
+                  >
+                    <Trophy size={18} color="var(--sv-teal-mid)" />
                     {leader.player_name}
                     {leader.player_name === attempt.player_name ? " (You)" : ""}
                   </div>
@@ -348,18 +366,29 @@ export function PerformanceReportView({
                     .slice(0, 10)
                     .map((r) => {
                       const mine = r.player_name === attempt.player_name;
+                      const isLeader = r.position === 1;
                       return (
                         <tr
                           key={`${r.position}-${r.player_name}`}
                           style={{
-                            background: mine ? "var(--sv-cyan-tint)" : "transparent",
-                            fontWeight: mine ? 700 : 500,
+                            background: mine || isLeader ? "var(--sv-cyan-tint)" : "transparent",
+                            fontWeight: mine ? 800 : isLeader ? 700 : 500,
                             color: "var(--sv-ink)",
                             borderBottom: "1px solid rgba(200,221,230,0.5)",
+                            boxShadow: mine
+                              ? "inset 3px 0 0 0 var(--sv-teal-mid)"
+                              : undefined,
                           }}
                         >
                           <td className="sv-tabular" style={tdStyle}>
-                            {r.position}
+                            {isLeader ? (
+                              <span className="inline-flex items-center gap-1">
+                                <Trophy size={14} color="var(--sv-teal-mid)" />
+                                {r.position}
+                              </span>
+                            ) : (
+                              r.position
+                            )}
                           </td>
                           <td style={tdStyle}>
                             {r.player_name}

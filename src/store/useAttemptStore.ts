@@ -117,36 +117,47 @@ function syncOpening(attempt: Attempt): OpeningRoundView | null {
   return getOpeningPreview(attempt);
 }
 
+/** Coalesce concurrent startSolo (Strict Mode double-effect, double-click). */
+let startSoloInflight: Promise<string> | null = null;
+
 export const useAttemptStore = create<AttemptState>((set, get) => ({
   ...initial,
 
   async startSolo(playerName: string) {
-    set({ error: null, submitting: true });
-    try {
-      const heat = await api.createHeat({ solo: true, player_name: playerName });
-      persistHeatCode(heat.access_code);
-      // Prefer access code for attempt create — same path multiplayer join uses
-      const attempt = withMigratedConfig(
-        await api.createAttempt(heat.access_code || heat.heat_id, {
-          player_name: playerName,
-        }),
-      );
-      const opening = syncOpening(attempt);
-      set({
-        attempt,
-        opening,
-        phase: "decide",
-        orderInput: 0,
-        heatAccessCode: heat.access_code,
-        submitting: false,
-      });
-      await get().refreshLeaderboards();
-      return attempt.attempt_id;
-    } catch (e) {
-      const { message } = parseApiFailure(e);
-      set({ error: message, submitting: false });
-      throw e;
-    }
+    if (startSoloInflight) return startSoloInflight;
+
+    startSoloInflight = (async () => {
+      set({ error: null, submitting: true });
+      try {
+        const heat = await api.createHeat({ solo: true, player_name: playerName });
+        persistHeatCode(heat.access_code);
+        // Prefer access code for attempt create — same path multiplayer join uses
+        const attempt = withMigratedConfig(
+          await api.createAttempt(heat.access_code || heat.heat_id, {
+            player_name: playerName,
+          }),
+        );
+        const opening = syncOpening(attempt);
+        set({
+          attempt,
+          opening,
+          phase: "decide",
+          orderInput: 0,
+          heatAccessCode: heat.access_code,
+          submitting: false,
+        });
+        await get().refreshLeaderboards();
+        return attempt.attempt_id;
+      } catch (e) {
+        const { message } = parseApiFailure(e);
+        set({ error: message, submitting: false });
+        throw e;
+      } finally {
+        startSoloInflight = null;
+      }
+    })();
+
+    return startSoloInflight;
   },
 
   async createHostedHeat(playerName?: string) {

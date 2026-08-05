@@ -24,7 +24,13 @@ export function PageTransition({
   className?: string;
 }) {
   return (
-    <div className={`transition-all duration-300 ease-out opacity-100 ${className}`}>
+    <div
+      className={`opacity-100 ${className}`}
+      style={{
+        // Opacity only — avoid transition: all (Emil)
+        transition: "opacity 200ms var(--sv-ease-out, cubic-bezier(0.23,1,0.32,1))",
+      }}
+    >
       {children}
     </div>
   );
@@ -74,9 +80,12 @@ export function GameButton({
       style={{
         fontFamily: "var(--sv-font-ui)",
         fontWeight: 600,
+        // Exact props only — never transition: all
+        transition:
+          "transform 140ms var(--sv-ease-out, cubic-bezier(0.23,1,0.32,1)), filter 160ms ease, box-shadow 160ms ease, background-color 160ms ease, border-color 160ms ease, opacity 160ms ease",
         ...style,
       }}
-      className={`rounded-sv-pill inline-flex items-center justify-center gap-2 transition-all duration-150 hover:brightness-105 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed ${variantClass} ${sizes[size]} ${className}`}
+      className={`rounded-sv-pill inline-flex items-center justify-center gap-2 touch-manipulation active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100 ${variantClass} ${sizes[size]} ${className}`}
       {...props}
     >
       {children}
@@ -121,7 +130,7 @@ export function TabBar({
             role="tab"
             aria-selected={isActive}
             onClick={() => onChange(tab.id)}
-            className="relative inline-flex items-center justify-center gap-1.5 rounded-full transition-colors duration-150 min-h-9 sm:min-h-0 touch-manipulation"
+            className="sv-tab relative inline-flex items-center justify-center gap-1.5 rounded-full min-h-9 sm:min-h-0 touch-manipulation"
             style={{
               fontFamily: "var(--sv-font-ui)",
               fontWeight: isActive ? 600 : 500,
@@ -172,7 +181,7 @@ export function GlassCard({
   return (
     <div
       onClick={onClick}
-      className={`sv-glass-card ${onClick ? "cursor-pointer active:translate-y-px hover:border-sv-teal-mid/40" : ""} ${className}`}
+      className={`sv-glass-card ${onClick ? "sv-press cursor-pointer" : ""} ${className}`}
     >
       {children}
     </div>

@@ -32,6 +32,13 @@ export interface StatItem {
   multiValue?: { label: string; value: string }[];
   color?: string;
   imageUrl?: string;
+  /** RAG indicator (red/amber/green) — always paired with accessible label. */
+  rag?: {
+    level: "green" | "amber" | "red";
+    label: string;
+    border: string;
+    dot: string;
+  };
 }
 
 interface BoxViewProps {
@@ -60,9 +67,12 @@ export default function BoxView({ data, gridCols = 2, dense = false }: BoxViewPr
   };
 
   return (
-    <Stagger className={`grid ${dense ? "gap-1.5" : "gap-3"} ${getGridClass()}`} delay={0.05}>
+    <Stagger
+      className={`grid ${dense ? "gap-1.5" : "gap-3"} ${getGridClass()}`}
+      delay={0.04}
+    >
       {data.map((stat) => (
-        <StaggerItem key={stat.id} className="h-full">
+        <StaggerItem key={stat.id} className="h-full" y={6}>
           <StatCard stat={stat} dense={dense} />
         </StaggerItem>
       ))}
@@ -107,29 +117,66 @@ function StatCard({ stat, dense = false }: { stat: StatItem; dense?: boolean }) 
     }
   };
 
+  const rag = stat.rag;
+
   return (
     <div
       style={{
         background: "var(--sv-card)",
-        border: "1.4px solid white",
+        border: rag ? `1.6px solid ${rag.border}` : "1.4px solid white",
         borderRadius: dense ? 12 : "var(--sv-radius-2xl)",
         padding: dense ? 10 : 16,
         minHeight: dense ? 72 : 96,
         height: "100%",
+        boxShadow: rag
+          ? `inset 3px 0 0 0 ${rag.dot}`
+          : undefined,
       }}
-      className={`flex justify-between items-start ${dense ? "gap-2" : "gap-3"}`}
+      className={`sv-surface flex justify-between items-start ${dense ? "gap-2" : "gap-3"}`}
+      aria-label={rag ? `${stat.title}: ${stat.value}, ${rag.label}` : undefined}
     >
       <div className={`flex flex-col ${dense ? "gap-0.5" : "gap-1.5"} min-w-0 flex-1`}>
-        <span
-          style={{
-            fontFamily: FO,
-            fontSize: dense ? 10 : 11,
-            fontWeight: 600,
-            color: "var(--sv-text-secondary)",
-          }}
-        >
-          {stat.title}
-        </span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span
+            style={{
+              fontFamily: FO,
+              fontSize: dense ? 10 : 11,
+              fontWeight: 600,
+              color: "var(--sv-text-secondary)",
+            }}
+          >
+            {stat.title}
+          </span>
+          {rag && (
+            <span
+              className="inline-flex items-center gap-1 shrink-0"
+              title={rag.label}
+            >
+              <span
+                aria-hidden
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: 999,
+                  background: rag.dot,
+                  display: "inline-block",
+                }}
+              />
+              <span
+                style={{
+                  fontFamily: FO,
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                  color: rag.border,
+                }}
+              >
+                {rag.label}
+              </span>
+            </span>
+          )}
+        </div>
         {stat.multiValue ? (
           <div className="space-y-1">
             {stat.multiValue.map((mv, idx) => (
@@ -161,7 +208,8 @@ function StatCard({ stat, dense = false }: { stat: StatItem; dense?: boolean }) 
         ) : (
           <div className="flex items-baseline gap-1.5">
             <span
-              className="sv-tabular"
+              key={stat.value}
+              className="sv-tabular sv-value-tick"
               style={{
                 fontFamily: FO,
                 fontSize: dense ? 18 : 22,

@@ -59,4 +59,28 @@ export interface RetailerChallengeApi {
   completeAttempt(attemptId: string): Promise<CompleteAttemptResponse>;
   getHeatLeaderboard(heatId: string, mode: "live" | "final"): Promise<LeaderboardRow[]>;
   getGlobalLeaderboard(configurationId: string): Promise<LeaderboardRow[]>;
+  getAdminData(): Promise<{
+    heats: Array<{
+      heat_id: string;
+      access_code: string;
+      created_at: string;
+      players: number;
+      config_id: string;
+      version: number;
+      status: "open" | "closed";
+    }>;
+    attempts: Array<{
+      attempt_id: string;
+      player_name: string;
+      heat_id: string;
+      status: string;
+      round: number;
+      cost: number;
+      started_at: string;
+    }>;
+    stats: { heats: number; attempts: number; completed: number; playing: number };
+  }>;
+  clearAdminData(): Promise<void>;
+  toggleHeatStatus(heatId: string): Promise<{ status: "open" | "closed" }>;
+  deleteHeat(heatId: string): Promise<void>;
 }

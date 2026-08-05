@@ -41,10 +41,10 @@ export function CoachSpeech({
   const borderColor = TONE_BORDER[tone];
   const isOverlay = size === "md";
 
-  // Mobile heights ~3× denser overlay sizing so the coach reads clearly on phones
+  // Mascot as accent — bubble is primary. Keep under ~120px on play overlay.
   const bustClass = isOverlay
-    ? "h-[216px] w-auto object-contain object-bottom [image-rendering:pixelated] sm:h-[96px] lg:h-[120px]"
-    : "h-[300px] w-auto object-contain object-bottom [image-rendering:pixelated] sm:h-[140px] lg:h-[220px]";
+    ? "h-[100px] w-auto object-contain object-bottom [image-rendering:pixelated] sm:h-[84px] lg:h-[96px]"
+    : "h-[160px] w-auto object-contain object-bottom [image-rendering:pixelated] sm:h-[120px] lg:h-[140px]";
 
   const bubbleMax = isOverlay
     ? "max-w-none flex-1 min-w-0"
@@ -163,8 +163,8 @@ export function CoachSpeech({
           unoptimized
           sizes={
             isOverlay
-              ? "(max-width: 640px) 216px, 120px"
-              : "(max-width: 640px) 300px, (max-width: 1024px) 140px, 220px"
+              ? "(max-width: 640px) 100px, 96px"
+              : "(max-width: 640px) 160px, (max-width: 1024px) 120px, 140px"
           }
           className={bustClass}
         />

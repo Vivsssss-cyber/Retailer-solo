@@ -548,3 +548,111 @@ export async function upsertConfiguration(
 export async function resetConfigurationToDefault(): Promise<GameConfig> {
   return upsertConfiguration(structuredClone(DEFAULT_CONFIG), { makeDefault: true });
 }
+
+export interface AdminStats {
+  heats: number;
+  attempts: number;
+  completed: number;
+  playing: number;
+}
+
+export interface AdminHeatRow {
+  heat_id: string;
+  access_code: string;
+  created_at: string;
+  players: number;
+  config_id: string;
+  version: number;
+  status: "open" | "closed";
+}
+
+export interface AdminAttemptRow {
+  attempt_id: string;
+  player_name: string;
+  heat_id: string;
+  status: string;
+  round: number;
+  cost: number;
+  started_at: string;
+}
+
+export interface AdminData {
+  heats: AdminHeatRow[];
+  attempts: AdminAttemptRow[];
+}
+
+export function getAdminStats(): AdminStats {
+  return withStore((store) => {
+    const attempts = Object.values(store.attempts ?? {});
+    return {
+      heats: Object.keys(store.heats ?? {}).length,
+      attempts: attempts.length,
+      completed: attempts.filter((a) => a.status === "completed").length,
+      playing: attempts.filter((a) => a.status === "playing").length,
+    };
+  });
+}
+
+export function getAdminData(): AdminData {
+  return withStore((store) => {
+    const heats = Object.values(store.heats ?? {}).map((h) => ({
+      heat_id: h.heat_id,
+      access_code: h.access_code,
+      created_at: h.created_at,
+      players: h.attempt_ids?.length ?? 0,
+      config_id: h.configuration?.configuration_id ?? "—",
+      version: h.configuration?.configuration_version ?? 0,
+      status: h.status,
+    }));
+    const attempts = Object.values(store.attempts ?? {}).map((a) => ({
+      attempt_id: a.attempt_id,
+      player_name: a.player_name,
+      heat_id: a.heat_id,
+      status: a.status,
+      round: a.current_round,
+      cost: a.cumulative_cost,
+      started_at: a.started_at,
+    }));
+    return { heats, attempts };
+  });
+}
+
+export async function clearAdminData(): Promise<void> {
+  return updateStore((store) => {
+    store.heats = {};
+    store.attempts = {};
+    store.codes = {};
+    store.globalCompleted = [];
+  });
+}
+
+export async function toggleHeatStatus(heatId: string): Promise<string> {
+  return updateStore((store) => {
+    const heat = store.heats[heatId];
+    if (!heat) {
+      throw new ApiError("HEAT_NOT_FOUND", "Heat not found");
+    }
+    heat.status = heat.status === "open" ? "closed" : "open";
+    return heat.status;
+  });
+}
+
+export async function deleteHeat(heatId: string): Promise<void> {
+  return updateStore((store) => {
+    const heat = store.heats[heatId];
+    if (!heat) {
+      throw new ApiError("HEAT_NOT_FOUND", "Heat not found");
+    }
+    for (const attId of heat.attempt_ids) {
+      delete store.attempts[attId];
+      const index = store.globalCompleted.indexOf(attId);
+      if (index > -1) {
+        store.globalCompleted.splice(index, 1);
+      }
+    }
+    const codeKey = codeIndexKey(heat.access_code);
+    delete store.codes[codeKey];
+    delete store.heats[heatId];
+  });
+}
+

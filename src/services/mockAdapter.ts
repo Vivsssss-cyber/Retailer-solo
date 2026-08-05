@@ -48,6 +48,7 @@ interface HeatRecord {
   configuration: GameConfig;
   attempt_ids: string[];
   created_at: string;
+  status?: "open" | "closed";
 }
 
 interface StoreShape {
@@ -250,6 +251,7 @@ export const mockAdapter: RetailerChallengeApi = {
       configuration,
       attempt_ids: [],
       created_at: new Date().toISOString(),
+      status: "open",
     };
     store.codes[codeIndexKey(access_code)] = heat_id;
     save(store);
@@ -274,6 +276,9 @@ export const mockAdapter: RetailerChallengeApi = {
         "HEAT_NOT_FOUND",
         "Heat not found. In mock mode, the code only works in this same browser. For multiplayer across devices, set NEXT_PUBLIC_USE_MOCK=false.",
       );
+    }
+    if (heat.status === "closed") {
+      throw errorWithCode("HEAT_NOT_FOUND", "Heat is closed");
     }
 
     const config = heat.configuration;
@@ -432,6 +437,65 @@ export const mockAdapter: RetailerChallengeApi = {
       );
     const rows = attempts.map((a, i) => toLeaderboardRow(a, i + 1));
     return sortFinal(rows);
+  },
+
+  async getAdminData() {
+    const store = load();
+    const heats = Object.values(store.heats ?? {}).map((h) => ({
+      heat_id: h.heat_id,
+      access_code: h.access_code,
+      created_at: h.created_at,
+      players: h.attempt_ids?.length ?? 0,
+      config_id: h.configuration?.configuration_id ?? "—",
+      version: h.configuration?.configuration_version ?? 0,
+      status: h.status ?? "open",
+    }));
+    const attempts = Object.values(store.attempts ?? {}).map((a) => ({
+      attempt_id: a.attempt_id,
+      player_name: a.player_name,
+      heat_id: a.heat_id,
+      status: a.status,
+      round: a.current_round,
+      cost: a.cumulative_cost,
+      started_at: a.started_at,
+    }));
+    const attemptList = Object.values(store.attempts ?? {});
+    const stats = {
+      heats: Object.keys(store.heats ?? {}).length,
+      attempts: attemptList.length,
+      completed: attemptList.filter((a) => a.status === "completed").length,
+      playing: attemptList.filter((a) => a.status === "playing").length,
+    };
+    return { heats, attempts, stats };
+  },
+
+  async clearAdminData() {
+    const store = emptyStore();
+    save(store);
+  },
+
+  async toggleHeatStatus(heatId: string) {
+    const store = load();
+    const heat = store.heats[heatId];
+    if (!heat) throw errorWithCode("HEAT_NOT_FOUND", "Heat not found");
+    heat.status = heat.status === "closed" ? "open" : "closed";
+    save(store);
+    return { status: heat.status };
+  },
+
+  async deleteHeat(heatId: string) {
+    const store = load();
+    const heat = store.heats[heatId];
+    if (!heat) throw errorWithCode("HEAT_NOT_FOUND", "Heat not found");
+    for (const attId of heat.attempt_ids) {
+      delete store.attempts[attId];
+      const idx = store.globalCompleted.indexOf(attId);
+      if (idx > -1) store.globalCompleted.splice(idx, 1);
+    }
+    const codeKey = codeIndexKey(heat.access_code);
+    delete store.codes[codeKey];
+    delete store.heats[heatId];
+    save(store);
   },
 };
 

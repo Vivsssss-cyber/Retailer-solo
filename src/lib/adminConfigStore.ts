@@ -103,7 +103,8 @@ export function normalizeGameConfig(input: GameConfig): GameConfig {
     .map((p) => ({
       round: Math.min(total, Math.max(1, Math.floor(p.round) || 1)),
       text: String(p.text).trim(),
-    }));
+    }))
+    .sort((a, b) => a.round - b.round);
 
   return {
     ...cfg,

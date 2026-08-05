@@ -1,11 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { FO, TabBar, cardStyle } from "@/components/cyan";
+import { useMemo } from "react";
+import { FO, cardStyle } from "@/components/cyan";
 import GraphicalView from "@/components/game/GraphicalView";
 import type { RoundRecord } from "@/engine";
 
-/** Side panel chart matching /demo/beer-game Inventory | Cost tabs. */
+/**
+ * Two side-by-side graphs (Rochak demo parity):
+ * 1) Inventory + Backlog + Demand (flow)
+ * 2) Cumulative cost
+ */
 export function TrendPanel({
   rounds,
   dense = false,
@@ -13,106 +17,110 @@ export function TrendPanel({
   rounds: RoundRecord[];
   dense?: boolean;
 }) {
-  const [tab, setTab] = useState<"flow" | "cost">("flow");
+  // Real game rounds only — R1, R2, … (no fake R0 zeros that skew axes / legend)
+  const chartData = useMemo(
+    () =>
+      rounds.map((r) => ({
+        name: `R${r.round}`,
+        Inventory: r.ending_inventory,
+        Backlog: r.ending_backlog,
+        Demand: r.customer_demand,
+        "Total Cost": r.cumulative_cost,
+      })),
+    [rounds],
+  );
 
-  const chartData = useMemo(() => {
-    if (rounds.length === 0) {
-      return [
-        {
-          name: "R0",
-          Inventory: 0,
-          Backlog: 0,
-          Demand: 0,
-          Orders: 0,
-          Delivery: 0,
-          "Total Cost": 0,
-        },
-      ];
-    }
-    return rounds.map((r) => ({
-      name: `R${r.round}`,
-      Inventory: r.ending_inventory,
-      Backlog: r.ending_backlog,
-      Demand: r.customer_demand,
-      Orders: r.placed_order,
-      Delivery: r.incoming_delivery,
-      "Total Cost": r.cumulative_cost,
-    }));
-  }, [rounds]);
+  const flowGraphical = useMemo(
+    () => ({
+      type: "evolution" as const,
+      title: "",
+      xAxis: "Rounds",
+      yAxis: ["Inventory", "Backlog", "Demand"],
+      chartData,
+      height: dense ? undefined : 200,
+      embedded: dense,
+      fill: dense,
+    }),
+    [chartData, dense],
+  );
 
-  /**
-   * Dense (play shell): fill parent via ResizeObserver — no fixed px trap.
-   * Standalone: fixed plot height for natural document flow.
-   */
-  const graphical = useMemo(() => {
-    if (tab === "flow") {
-      return {
-        type: "evolution" as const,
-        title: "",
-        xAxis: "Rounds",
-        yAxis: ["Inventory", "Backlog", "Demand", "Orders", "Delivery"],
-        chartData,
-        height: dense ? undefined : 240,
-        embedded: dense,
-        fill: dense,
-      };
-    }
-    return {
+  const costGraphical = useMemo(
+    () => ({
       type: "evolution" as const,
       title: "",
       xAxis: "Rounds",
       yAxis: ["Total Cost"],
       chartData,
-      height: dense ? undefined : 240,
+      height: dense ? undefined : 200,
       embedded: dense,
       fill: dense,
-    };
-  }, [tab, chartData, dense]);
+    }),
+    [chartData, dense],
+  );
+
+  const titleStyle = {
+    fontFamily: FO,
+    fontWeight: 700 as const,
+    fontSize: dense ? 11 : 12,
+    color: "var(--sv-ink)",
+  };
+
+  const cardPad = dense ? 12 : 14;
 
   return (
     <div
-      style={{
-        ...cardStyle,
-        padding: dense ? 8 : 12,
-        height: dense ? "100%" : undefined,
-        minHeight: dense ? 0 : undefined,
-      }}
-      className="flex flex-col min-h-0 min-w-0 w-full"
+      className={[
+        "grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 min-h-0 min-w-0 w-full",
+        dense ? "h-full" : "",
+      ].join(" ")}
     >
       <div
-        className={`flex items-center justify-between gap-2 ${dense ? "mb-1" : "mb-2"} shrink-0`}
+        style={{
+          ...cardStyle,
+          padding: cardPad,
+          height: dense ? "100%" : undefined,
+          minHeight: dense ? 0 : undefined,
+          // Allow tooltip / axis ticks to paint outside plot box
+          overflow: "visible",
+        }}
+        className="sv-surface sv-chart-card flex flex-col min-h-0 min-w-0 w-full"
       >
-        <span
-          style={{
-            fontFamily: FO,
-            fontWeight: 700,
-            fontSize: dense ? 12 : 13,
-            color: "var(--sv-ink)",
-          }}
+        <div className={`shrink-0 ${dense ? "mb-1.5" : "mb-2"}`}>
+          <span style={titleStyle}>Inventory &amp; flow</span>
+        </div>
+        <div
+          className={
+            dense
+              ? "flex-1 min-h-0 min-w-0 w-full overflow-visible"
+              : "w-full min-w-0 shrink-0 overflow-visible"
+          }
         >
-          Trend
-        </span>
-        <TabBar
-          tabs={[
-            { id: "flow", label: dense ? "Flow" : "Inventory & flow" },
-            { id: "cost", label: dense ? "Cost" : "Cost over time" },
-          ]}
-          activeTab={tab}
-          onChange={(id) => setTab(id as "flow" | "cost")}
-        />
+          <GraphicalView data={flowGraphical} />
+        </div>
       </div>
-      {/*
-        Dense: flex-1 so GraphicalView can measure a real height on big screens.
-        Non-dense: natural height from fixed plot.
-      */}
+
       <div
-        className={
-          dense
-            ? "flex-1 min-h-0 min-w-0 w-full"
-            : "w-full min-w-0 shrink-0"
-        }
+        style={{
+          ...cardStyle,
+          padding: cardPad,
+          height: dense ? "100%" : undefined,
+          minHeight: dense ? 0 : undefined,
+          overflow: "visible",
+        }}
+        className="sv-surface sv-chart-card flex flex-col min-h-0 min-w-0 w-full"
       >
-        <GraphicalView data={graphical} />
+        <div className={`shrink-0 ${dense ? "mb-1.5" : "mb-2"}`}>
+          <span style={titleStyle}>Cost over time</span>
+        </div>
+        <div
+          className={
+            dense
+              ? "flex-1 min-h-0 min-w-0 w-full overflow-visible"
+              : "w-full min-w-0 shrink-0 overflow-visible"
+          }
+        >
+          <GraphicalView data={costGraphical} />
+        </div>
       </div>
     </div>
   );

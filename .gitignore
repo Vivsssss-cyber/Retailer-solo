@@ -77,3 +77,10 @@ temp/
 test-results/
 playwright-report/
 blob-report/
+
+# Local agent / project notes (keep untracked)
+docs/
+CLAUDE.md
+Claude.md
+claude.md
+.context/

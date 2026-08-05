@@ -99,6 +99,11 @@ nextjs-portal:empty {
   --sv-grid-size: 63px;
   --sv-max-page-width: 1288px;
   --sv-ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Emil: strong ease-out for UI feedback; travel for on-screen morph */
+  --sv-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --sv-ease-travel: cubic-bezier(0.65, 0, 0.35, 1);
+  --sv-press-ms: 140ms;
+  --sv-ui-ms: 200ms;
 }
 
 @theme {
@@ -227,6 +232,8 @@ nextjs-portal:empty {
   backdrop-filter: blur(40px) saturate(1.5);
   -webkit-backdrop-filter: blur(40px) saturate(1.5);
   isolation: isolate;
+  /* Rise into place when decide phase mounts (see @keyframes sv-dock-up) */
+  animation: sv-dock-up 280ms var(--sv-ease-out) both;
 }
 
 /* Meter fills — width transitions honor reduced motion */
@@ -1258,6 +1265,169 @@ body {
   padding-bottom: 2px;
 }
 
+/* ─── Charts (Recharts) — padding / clip ───
+   Recharts defaults clip surface + wrapper; dots and axis ticks
+   need room and overflow:visible so they don't get sheared. */
+.sv-chart,
+.sv-chart-card,
+.sv-chart-plot {
+  overflow: visible;
+}
+.sv-chart-plot .recharts-responsive-container,
+.sv-chart-plot .recharts-wrapper,
+.sv-chart-plot .recharts-surface {
+  overflow: visible !important;
+}
+/* Soften SVG clip-path so peak markers aren't hard-cropped */
+.sv-chart-plot .recharts-surface {
+  overflow: visible;
+}
+
+/* ─── Play shell micro-interactions (Emil) ───
+   Feedback only: press, state change, prevent jarring swaps.
+   Never animate keyboard-driven bulk actions. */
+
+/* Pressable: instant “heard you” scale — 0.97 is the sweet spot */
+.sv-press {
+  transition:
+    transform var(--sv-press-ms) var(--sv-ease-out),
+    background-color var(--sv-ui-ms) ease,
+    border-color var(--sv-ui-ms) ease,
+    color var(--sv-ui-ms) ease,
+    opacity var(--sv-ui-ms) ease,
+    box-shadow var(--sv-ui-ms) ease;
+  transform: scale(1);
+  touch-action: manipulation;
+}
+.sv-press:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(0.97);
+}
+.sv-press:disabled,
+.sv-press[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/* Quiet surface hover — pointer-fine only (no sticky mobile hover) */
+.sv-surface {
+  transition:
+    border-color var(--sv-ui-ms) ease,
+    box-shadow var(--sv-ui-ms) ease,
+    background-color var(--sv-ui-ms) ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .sv-surface:hover {
+    border-color: color-mix(in srgb, var(--sv-teal-mid) 28%, white);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.85),
+      0 6px 18px rgba(0, 44, 51, 0.06);
+  }
+}
+
+/* Number tick when KPI / stepper / rank value changes */
+@keyframes sv-value-tick {
+  from {
+    opacity: 0.45;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.sv-value-tick {
+  display: inline-block;
+  animation: sv-value-tick 180ms var(--sv-ease-out) both;
+}
+
+/* Soft flash when a new history row lands */
+@keyframes sv-row-in {
+  from {
+    background-color: color-mix(in srgb, var(--sv-cyan) 16%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.sv-row-new {
+  animation: sv-row-in 720ms var(--sv-ease-out) both;
+}
+.sv-table-row {
+  transition: background-color 160ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .sv-table-row:hover {
+    background-color: color-mix(in srgb, var(--sv-cyan-tint) 55%, transparent);
+  }
+}
+
+/* Progress segments fill without layout thrash */
+.sv-progress-seg {
+  transition:
+    background-color 220ms var(--sv-ease-out),
+    opacity 220ms var(--sv-ease-out),
+    transform 220ms var(--sv-ease-out);
+  transform: scaleY(1);
+  transform-origin: center;
+}
+.sv-progress-seg[data-active="true"] {
+  transform: scaleY(1.35);
+}
+
+/* Decision dock entrance (applied on .sv-frost-dock) */
+@keyframes sv-dock-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Phase shell: decide ↔ summary without hard cut */
+@keyframes sv-phase-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.sv-phase-in {
+  animation: sv-phase-in 240ms var(--sv-ease-out) both;
+}
+
+/* Tab pill: press + soft bg (colors still set inline / by state) */
+.sv-tab {
+  transition:
+    transform var(--sv-press-ms) var(--sv-ease-out),
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.sv-tab:active {
+  transform: scale(0.97);
+}
+
+/* Lead banner when #1 */
+@keyframes sv-lead-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.sv-lead-banner {
+  animation: sv-lead-in 260ms var(--sv-ease-out) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sv-snap-in,
   .sv-reach-flash,
@@ -1274,7 +1444,12 @@ body {
   .sv-drawer-down,
   .sv-drawer-scrim-in,
   .sv-drawer-scrim-out,
-  .sv-drawer-content-in {
+  .sv-drawer-content-in,
+  .sv-value-tick,
+  .sv-row-new,
+  .sv-frost-dock,
+  .sv-phase-in,
+  .sv-lead-banner {
     animation: none;
     opacity: 1;
     transform: none;
@@ -1289,7 +1464,10 @@ body {
   }
   .sv-btn,
   .sv-btn:hover,
-  .sv-btn:active {
+  .sv-btn:active,
+  .sv-press:active,
+  .sv-tab:active,
+  .sv-progress-seg[data-active="true"] {
     transform: none;
   }
   .sv-banner-sheen::after {
@@ -1305,6 +1483,13 @@ body {
   /* Kill meter width / stroke transitions (not just keyframe animations) */
   .sv-meter-fill,
   .sv-meter-stroke {
+    transition: none !important;
+  }
+  .sv-press,
+  .sv-surface,
+  .sv-table-row,
+  .sv-progress-seg,
+  .sv-tab {
     transition: none !important;
   }
 }

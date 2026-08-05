@@ -24,14 +24,14 @@ function usePlayerAvatar(): string | null {
 }
 
 /** Strong ease-out — starts quick, settles soft (Emil). */
-const EASE_OUT = [0.16, 1, 0.3, 1] as const;
+const EASE_OUT = [0.23, 1, 0.32, 1] as const;
 
 const containerVariants = {
   hidden: {},
   show: {
     transition: {
-      staggerChildren: 0.06,
-      delayChildren: 0.02,
+      staggerChildren: 0.045,
+      delayChildren: 0.04,
     },
   },
 };
@@ -39,14 +39,15 @@ const containerVariants = {
 const itemVariants = {
   hidden: {
     opacity: 0,
+    // scale ≥ 0.95 — nothing in the real world appears from zero (Emil)
     // Full transform string = hardware-accelerated path in motion
-    transform: "translateY(12px)",
+    transform: "translateY(8px) scale(0.97)",
   },
   show: {
     opacity: 1,
-    transform: "translateY(0px)",
+    transform: "translateY(0px) scale(1)",
     transition: {
-      duration: 0.42,
+      duration: 0.3,
       ease: EASE_OUT,
     },
   },
@@ -238,7 +239,7 @@ function SummaryLayout({
               variants: {
                 hidden: {},
                 show: {
-                  transition: { staggerChildren: 0.05, delayChildren: 0 },
+                  transition: { staggerChildren: 0.04, delayChildren: 0.02 },
                 },
               },
             }

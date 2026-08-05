@@ -137,6 +137,11 @@ Copy `.env.example` → `.env.local`:
 - ~~Live board polling during play~~ (done: 4s poll while status=playing)  
 - ~~Official one-attempt UX~~ (done: practice vs official + email lock + friendly errors)  
 - ~~True single-screen no-scroll densify~~ (done: 100dvh play shell + dense KPIs/charts)  
+- ~~Progressive density~~ (done: rounds 1–2 simplified + stronger coach; 3+ charts/history)  
+- ~~Onboarding fast path~~ (done: practice = avatar + name → start; heat/host full wizard)  
+- ~~First-run interactive tutorial~~ (done: sample order → delay → costs; skippable once)  
+- ~~Official irreversible confirm~~ (done: warning + checkbox before lock-in)  
+- ~~Host classroom share~~ (done: large code, copy, QR, join link `?code=`, waiting copy)  
 
 ### Known backend gaps (B5–B6)
 

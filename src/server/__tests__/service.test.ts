@@ -244,3 +244,53 @@ describe("leaderboards", () => {
     expect(global.some((row) => row.player_name === "Playing")).toBe(false);
   });
 });
+
+describe("admin controls", () => {
+  it("compiles admin stats and data, handles status toggle, and deletion", async () => {
+    const { getAdminStats, getAdminData, clearAdminData, toggleHeatStatus, deleteHeat } = await import("../service");
+
+    let stats = getAdminStats();
+    expect(stats.heats).toBe(0);
+    expect(stats.attempts).toBe(0);
+
+    const heat = await createHeat({ solo: false });
+    const attempt = await createAttempt(heat.heat_id, { player_name: "Admin Tester" });
+    expect(attempt.player_name).toBe("Admin Tester");
+
+    stats = getAdminStats();
+    expect(stats.heats).toBe(1);
+    expect(stats.attempts).toBe(1);
+    expect(stats.playing).toBe(1);
+
+    const data = getAdminData();
+    expect(data.heats).toHaveLength(1);
+    expect(data.heats[0].access_code).toBe(heat.access_code);
+    expect(data.heats[0].status).toBe("open");
+    expect(data.attempts).toHaveLength(1);
+    expect(data.attempts[0].player_name).toBe("Admin Tester");
+
+    // toggle heat status
+    const status = await toggleHeatStatus(heat.heat_id);
+    expect(status).toBe("closed");
+    expect(getAdminData().heats[0].status).toBe("closed");
+
+    // should reject new attempt if heat is closed
+    await expect(
+      createAttempt(heat.heat_id, { player_name: "Late Player" })
+    ).rejects.toMatchObject({ code: "HEAT_NOT_FOUND" });
+
+    // delete heat
+    await deleteHeat(heat.heat_id);
+    stats = getAdminStats();
+    expect(stats.heats).toBe(0);
+    expect(stats.attempts).toBe(0);
+
+    // clear admin data
+    const heat2 = await createHeat({ solo: true });
+    await createAttempt(heat2.heat_id, { player_name: "Clear Tester" });
+    expect(getAdminStats().heats).toBe(1);
+    await clearAdminData();
+    expect(getAdminStats().heats).toBe(0);
+  });
+});
+

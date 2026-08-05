@@ -42,12 +42,13 @@ export function RoundProgressBar({
             <span className="text-sv-text-muted font-semibold"> / {totalRounds}</span>
           </span>
         </div>
-        <div className="flex gap-0.5 sm:gap-1">
+        <div className="flex gap-0.5 sm:gap-1 items-center">
           {segments.map(({ done, active, index }) => (
             <div
               key={index}
               title={`${unit} ${index + 1}`}
-              className="flex-1 min-w-0 h-1.5 rounded-full transition-[background,opacity] duration-200"
+              data-active={active ? "true" : "false"}
+              className="sv-progress-seg flex-1 min-w-0 h-1.5 rounded-full"
               style={{
                 background: done
                   ? "var(--sv-teal-mid)"
@@ -86,11 +87,13 @@ export function RoundProgressBar({
           {completedRounds > 0 ? ` · ${completedRounds} done` : ""}
         </span>
       </div>
-      <div className="flex gap-1">
+      <div className="flex gap-1 items-center">
         {segments.map(({ done, active, index }) => (
           <div
             key={index}
             title={`${unit} ${index + 1}`}
+            data-active={active ? "true" : "false"}
+            className="sv-progress-seg"
             style={{
               flex: 1,
               height: 6,

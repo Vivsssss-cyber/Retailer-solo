@@ -5,7 +5,17 @@ import Image from "next/image";
 import { Users, Truck, ShoppingCart, Package } from "@/components/cyan/PixelIcons";
 
 const FO = "var(--sv-font-ui)";
+/** Strong ease-out — enter/settle (Emil). */
 const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
+/** Strong ease-in-out — on-screen travel (Emil). */
+const EASE_TRAVEL = "cubic-bezier(0.65, 0, 0.35, 1)";
+/** Marker travel length — explanatory but not sluggish. */
+const MARKER_DURATION = "3.2s";
+const MARKER_DELAYS = {
+  received: "0.08s",
+  requested: "0.28s",
+  sent: "0.48s",
+} as const;
 
 const customStyles = `
 @keyframes float-subtle {
@@ -44,6 +54,11 @@ const customStyles = `
 }
 .sv-status-rail {
   top: calc(var(--sv-node-size, 72px) / 2);
+}
+.sv-active-rail {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform-box: fill-box;
 }
 .sv-player-avatar-frame {
   width: var(--sv-avatar-size, 64px);
@@ -87,6 +102,16 @@ const customStyles = `
   }
   .sv-marker-track {
     animation: none !important;
+  }
+  .sv-active-rail {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: translateY(-50%) scaleX(1) !important;
+  }
+  .sv-marker-lift {
+    animation: none !important;
+    transform: translateY(-84px) scale(1) !important;
+    opacity: 1 !important;
   }
 }
 `;
@@ -277,57 +302,54 @@ export default function StatusView({
           minHeight: showSimulation ? (showPlayerAvatar ? 320 : 250) : 140,
         }}
       >
-        {/* Travel markers (above rail) */}
-        {showSimulation && (
-          <div
-            className="absolute inset-x-0 top-0 z-30"
-            style={{ height: "calc(var(--sv-rail-top, 92px) + 8px)" }}
-          >
-            {data.incomingAmount !== undefined && currentIdx > 0 && (
-              <FlowMarker
-                id="received"
-                startX={prevCenter}
-                endX={currentCenter}
-                label="Received"
-                value={`${data.incomingAmount}/${data.originalOrderAmount || 0}`}
-                icon={<Truck size={22} color="var(--sv-teal-mid)" />}
-                accent="var(--sv-positive)"
-                duration="2.6s"
-                delay="0.12s"
-              />
-            )}
-            {data.orderAmount !== undefined && currentIdx > 0 && (
-              <FlowMarker
-                id="requested"
-                startX={currentCenter}
-                endX={prevCenter}
-                label="Ordered"
-                value={`${data.orderAmount}`}
-                icon={<ShoppingCart size={22} color="var(--sv-teal-mid)" />}
-                accent="var(--sv-teal-mid)"
-                duration="2.6s"
-                delay="0.38s"
-              />
-            )}
-            {data.outgoingAmount !== undefined &&
-              currentIdx < data.stages.length - 1 && (
-                <FlowMarker
-                  id="sent"
-                  startX={currentCenter}
-                  endX={nextCenter}
-                  label="Shipped"
-                  value={`${data.outgoingAmount}/${data.incomingDemand || 0}`}
-                  icon={<Package size={22} color="var(--sv-teal-mid)" />}
-                  accent="var(--sv-teal-mid)"
-                  duration="2.6s"
-                  delay="0.64s"
-                />
-              )}
-          </div>
-        )}
+
 
         {/* Rail + stage nodes */}
         <div className="relative w-full" style={{ marginTop: showSimulation ? 8 : 0 }}>
+          {/* Travel markers (above rail) */}
+          {showSimulation && (
+            <div
+              className="absolute inset-0 z-30 pointer-events-none"
+            >
+              {data.incomingAmount !== undefined && currentIdx > 0 && (
+                <FlowMarker
+                  id="received"
+                  startX={prevCenter}
+                  endX={currentCenter}
+                  label="Order Received"
+                  value={`${data.incomingAmount}/${data.originalOrderAmount || 0}`}
+                  icon={<Package size={24} color="var(--sv-teal-dark)" />}
+                  duration={MARKER_DURATION}
+                  delay={MARKER_DELAYS.received}
+                />
+              )}
+              {data.orderAmount !== undefined && currentIdx > 0 && (
+                <FlowMarker
+                  id="requested"
+                  startX={currentCenter}
+                  endX={prevCenter}
+                  label="Requested Order"
+                  value={`${data.orderAmount}`}
+                  icon={<ShoppingCart size={24} color="var(--sv-teal-dark)" />}
+                  duration={MARKER_DURATION}
+                  delay={MARKER_DELAYS.requested}
+                />
+              )}
+              {data.outgoingAmount !== undefined &&
+                currentIdx < data.stages.length - 1 && (
+                  <FlowMarker
+                    id="sent"
+                    startX={currentCenter}
+                    endX={nextCenter}
+                    label="Order Sent"
+                    value={`${data.outgoingAmount}/${data.incomingDemand || 0}`}
+                    icon={<Truck size={24} color="var(--sv-teal-dark)" />}
+                    duration={MARKER_DURATION}
+                    delay={MARKER_DELAYS.sent}
+                  />
+                )}
+            </div>
+          )}
           {/* Base rail */}
           <div
             aria-hidden
@@ -344,57 +366,72 @@ export default function StatusView({
           {/* Active rails + direction arrows on the lines */}
           {currentIdx > 0 && (
             <>
-              <div
-                aria-hidden
-                className="absolute sv-status-rail"
-                style={{
-                  left: `${prevCenter}%`,
-                  width: `${currentCenter - prevCenter}%`,
-                  height: 3,
-                  background:
-                    "linear-gradient(90deg, var(--sv-teal-light), var(--sv-teal-mid))",
-                  borderRadius: 9999,
-                  transform: "translateY(-50%)",
-                }}
-              />
-              {/* Incoming delivery → right; orders → left */}
+              {!showSimulation && (
+                <div
+                  aria-hidden
+                  className="absolute sv-status-rail"
+                  style={{
+                    left: `${prevCenter}%`,
+                    width: `${currentCenter - prevCenter}%`,
+                    height: 3,
+                    background: "linear-gradient(90deg, var(--sv-teal-light), var(--sv-teal-mid))",
+                    borderRadius: 9999,
+                    transform: "translateY(-50%)",
+                  }}
+                />
+              )}
               {showSimulation && data.incomingAmount !== undefined && (
-                <RailLineArrow
-                  xPct={(prevCenter + currentCenter) / 2 + 4}
+                <ActiveRail
+                  id="rail-incoming"
+                  startX={prevCenter}
+                  endX={currentCenter}
                   direction="right"
-                  color="var(--sv-positive)"
+                  duration={MARKER_DURATION}
+                  delay={MARKER_DELAYS.received}
+                  colorStart="var(--sv-teal-light)"
+                  colorEnd="var(--sv-positive)"
                 />
               )}
               {showSimulation && data.orderAmount !== undefined && (
-                <RailLineArrow
-                  xPct={(prevCenter + currentCenter) / 2 - 4}
+                <ActiveRail
+                  id="rail-order"
+                  startX={currentCenter}
+                  endX={prevCenter}
                   direction="left"
-                  color="var(--sv-teal-mid)"
+                  duration={MARKER_DURATION}
+                  delay={MARKER_DELAYS.requested}
+                  colorStart="var(--sv-teal-light)"
+                  colorEnd="var(--sv-teal-mid)"
                 />
               )}
             </>
           )}
           {currentIdx < data.stages.length - 1 && currentIdx >= 0 && (
             <>
-              <div
-                aria-hidden
-                className="absolute sv-status-rail"
-                style={{
-                  left: `${currentCenter}%`,
-                  width: `${nextCenter - currentCenter}%`,
-                  height: 3,
-                  background:
-                    "linear-gradient(90deg, var(--sv-teal-mid), var(--sv-teal-light))",
-                  borderRadius: 9999,
-                  transform: "translateY(-50%)",
-                }}
-              />
-              {/* Shipped → right toward customer */}
+              {!showSimulation && (
+                <div
+                  aria-hidden
+                  className="absolute sv-status-rail"
+                  style={{
+                    left: `${currentCenter}%`,
+                    width: `${nextCenter - currentCenter}%`,
+                    height: 3,
+                    background: "linear-gradient(90deg, var(--sv-teal-mid), var(--sv-teal-light))",
+                    borderRadius: 9999,
+                    transform: "translateY(-50%)",
+                  }}
+                />
+              )}
               {showSimulation && data.outgoingAmount !== undefined && (
-                <RailLineArrow
-                  xPct={(currentCenter + nextCenter) / 2}
+                <ActiveRail
+                  id="rail-outgoing"
+                  startX={currentCenter}
+                  endX={nextCenter}
                   direction="right"
-                  color="var(--sv-teal-mid)"
+                  duration={MARKER_DURATION}
+                  delay={MARKER_DELAYS.sent}
+                  colorStart="var(--sv-teal-mid)"
+                  colorEnd="var(--sv-teal-light)"
                 />
               )}
             </>
@@ -553,47 +590,97 @@ export default function StatusView({
   );
 }
 
-/** Filled chevron centered on a rail segment — no glow. */
-function RailLineArrow({
-  xPct,
+function ActiveRail({
+  startX,
+  endX,
   direction,
-  color,
+  duration,
+  delay,
+  colorStart,
+  colorEnd,
+  id,
 }: {
-  xPct: number;
+  startX: number;
+  endX: number;
   direction: "left" | "right";
-  color: string;
+  duration: string;
+  delay: string;
+  colorStart: string;
+  colorEnd: string;
+  id: string;
 }) {
+  const widthPct = Math.abs(endX - startX);
+  const isRight = direction === "right";
+  const animName = `fill-rail-${id}`;
+
+  // scaleX (not width) — GPU-only, no layout thrash while markers travel
+  const customAnim = `
+    @keyframes ${animName} {
+      0% {
+        transform: translateY(-50%) scaleX(0.001);
+        opacity: 0;
+      }
+      10% {
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(-50%) scaleX(1);
+        opacity: 1;
+      }
+    }
+  `;
+
   return (
-    <div
-      aria-hidden
-      className="absolute z-[5] pointer-events-none sv-status-rail"
-      style={{
-        left: `${xPct}%`,
-        transform: "translate(-50%, -50%)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <svg
-        width={12}
-        height={12}
-        viewBox="0 0 10 10"
-        fill="none"
+    <>
+      <style dangerouslySetInnerHTML={{ __html: customAnim }} />
+      <div
+        aria-hidden
+        className="absolute sv-status-rail sv-active-rail z-[5]"
         style={{
-          display: "block",
-          transform: direction === "left" ? "scaleX(-1)" : undefined,
+          left: isRight ? `${startX}%` : undefined,
+          right: !isRight ? `${100 - startX}%` : undefined,
+          width: `${widthPct}%`,
+          height: 3,
+          background: `linear-gradient(${isRight ? 90 : -90}deg, ${colorStart}, ${colorEnd})`,
+          borderRadius: 9999,
+          transformOrigin: isRight ? "left center" : "right center",
+          transform: "translateY(-50%) scaleX(1)",
+          animation: `${animName} ${duration} ${EASE_TRAVEL} ${delay} both`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: isRight ? "flex-end" : "flex-start",
         }}
       >
-        <path
-          d="M3 1.5L7.5 5L3 8.5"
-          stroke={color}
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </div>
+        <div
+          style={{
+            position: "absolute",
+            [isRight ? "right" : "left"]: -4,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <svg
+            width={12}
+            height={12}
+            viewBox="0 0 10 10"
+            fill="none"
+            style={{
+              display: "block",
+              transform: isRight ? "none" : "scaleX(-1)",
+            }}
+          >
+            <path
+              d="M3 1.5L7.5 5L3 8.5"
+              stroke={colorEnd}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -604,8 +691,7 @@ function FlowMarker({
   label,
   value,
   icon,
-  accent,
-  duration = "2.6s",
+  duration = MARKER_DURATION,
   delay = "0s",
 }: {
   id: string;
@@ -614,17 +700,19 @@ function FlowMarker({
   label: string;
   value: string;
   icon: React.ReactNode;
-  accent: string;
   duration?: string;
   delay?: string;
 }) {
-  const animName = `move-marker-${id}`;
-  // One-shot: ease into destination, stay (forwards). No disappear.
+  const animNameX = `move-marker-x-${id}`;
+  const animNameLift = `move-marker-lift-${id}`;
+
+  // Travel = ease-in-out (on-screen motion). Lift/settle = ease-out (responsive).
+  // Soft opacity + scale entry — never pop from nothing.
   const customAnim = `
-    @keyframes ${animName} {
+    @keyframes ${animNameX} {
       0% {
         transform: translate3d(${startX}%, 0, 0);
-        opacity: 0.7;
+        opacity: 0;
       }
       12% {
         opacity: 1;
@@ -634,79 +722,122 @@ function FlowMarker({
         opacity: 1;
       }
     }
+    @keyframes ${animNameLift} {
+      0% {
+        transform: translateY(-12px) scale(0.94);
+        opacity: 0;
+      }
+      14% {
+        transform: translateY(-16px) scale(1);
+        opacity: 1;
+      }
+      68% {
+        transform: translateY(-16px) scale(1);
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(-84px) scale(1);
+        opacity: 1;
+      }
+    }
   `;
 
   return (
-    <div className="absolute inset-x-0 top-0 pointer-events-none" style={{ height: "100%" }}>
+    <div
+      className="absolute inset-x-0 top-0 pointer-events-none z-[10]"
+      style={{ height: "100%" }}
+    >
       <style dangerouslySetInnerHTML={{ __html: customAnim }} />
       <div
         className="sv-marker-track absolute left-0 top-0 w-full"
         style={{
+          top: 0,
           transform: `translate3d(${endX}%, 0, 0)`,
           opacity: 1,
-          animation: `${animName} ${duration} ${EASE_OUT} ${delay} both`,
+          animation: `${animNameX} ${duration} ${EASE_TRAVEL} ${delay} both`,
         }}
       >
         <div
           className="absolute left-0 top-0"
           style={{ transform: "translateX(-50%)" }}
         >
-          <div className="sv-float-marker">
-            <div className="sv-float-marker-inner flex flex-col items-center gap-1">
+          <div
+            className="sv-marker-lift"
+            style={{
+              animation: `${animNameLift} ${duration} ${EASE_OUT} ${delay} both`,
+            }}
+          >
+            <div className="sv-float-marker">
               <div
-                className="sv-tabular"
-                style={{
-                  background: "var(--sv-card-solid)",
-                  border: "1px solid color-mix(in srgb, var(--sv-border) 80%, white)",
-                  borderRadius: "var(--sv-radius-pill)",
-                  padding: "3px 9px",
-                  fontFamily: FO,
-                  fontSize: 11,
-                  fontWeight: 800,
-                  color: accent,
-                  whiteSpace: "nowrap",
-                  letterSpacing: "-0.02em",
-                }}
+                className="sv-float-marker-inner relative"
+                style={{ width: 140, height: 88 }}
               >
-                {value}
-                <span
-                  style={{
-                    fontWeight: 600,
-                    fontSize: 10,
-                    color: "var(--sv-text-secondary)",
-                    marginLeft: 3,
-                  }}
+                {/* Value Pill (Top) */}
+                <div
+                  className="absolute w-full flex justify-center"
+                  style={{ top: 2 }}
                 >
-                  u
-                </span>
+                  <div
+                    className="sv-tabular"
+                    style={{
+                      background: "white",
+                      boxShadow: "0 2px 8px rgba(0,44,51,0.08)",
+                      border:
+                        "1px solid color-mix(in srgb, var(--sv-border) 40%, white)",
+                      borderRadius: "var(--sv-radius-pill)",
+                      padding: "3px 8px",
+                      fontFamily: FO,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "var(--sv-ink)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {value}
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        color: "var(--sv-text-secondary)",
+                        marginLeft: 4,
+                      }}
+                    >
+                      units
+                    </span>
+                  </div>
+                </div>
+
+                {/* Icon (Center on rail) */}
+                <div
+                  className="absolute w-full flex justify-center"
+                  style={{ top: 44, transform: "translateY(-50%)" }}
+                >
+                  <div
+                    style={{
+                      filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.12))",
+                    }}
+                  >
+                    {icon}
+                  </div>
+                </div>
+
+                {/* Label (Bottom) */}
+                <div
+                  className="absolute w-full flex justify-center"
+                  style={{ top: 62 }}
+                >
+                  <span
+                    style={{
+                      fontFamily: FO,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "var(--sv-ink)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {label}
+                  </span>
+                </div>
               </div>
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 12,
-                  background: "var(--sv-cyan-tint)",
-                  border: "1.4px solid white",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {icon}
-              </div>
-              <span
-                style={{
-                  fontFamily: FO,
-                  fontSize: 9,
-                  fontWeight: 700,
-                  color: "var(--sv-text-secondary)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.07em",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {label}
-              </span>
             </div>
           </div>
         </div>
@@ -714,3 +845,4 @@ function FlowMarker({
     </div>
   );
 }
+

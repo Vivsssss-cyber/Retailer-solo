@@ -7,20 +7,28 @@ import { useAttemptStore } from "@/store/useAttemptStore";
 import { GameHeader } from "./GameHeader";
 import { livePositionFor } from "./ChallengeHeader";
 import { StatusStrip } from "./StatusStrip";
-import { PipelineStrip } from "./PipelineStrip";
 import { SupplyChainAnimation } from "./SupplyChainAnimation";
 import { DecisionPanel } from "./DecisionPanel";
 import { LiveLeaderboard } from "./LiveLeaderboard";
 import { TrendPanel } from "./TrendPanel";
 import { RoundHistoryTable } from "./RoundHistoryTable";
-import { RulesPanel } from "./RulesPanel";
+import { PlayTour } from "./PlayTour";
 import { PlayCoachOverlay } from "./PlayCoachOverlay";
 import { PerformanceReportView } from "@/components/report/PerformanceReport";
 import { migrateGameConfig } from "@/engine";
+import { hasCompletedPlayTour } from "@/lib/playTour";
 
 export function PlayScreen({ attemptId }: { attemptId: string }) {
   const router = useRouter();
-  const [showRules, setShowRules] = useState(false);
+  /**
+   * Focused-element coach tour (dark overlay + spotlight).
+   * Auto-starts once; How to Play reopens it anytime.
+   */
+  const [tourActive, setTourActive] = useState(() =>
+    typeof window !== "undefined" ? !hasCompletedPlayTour() : false,
+  );
+  /** True when user reopened via How to play (not first-run auto). */
+  const [tourReplay, setTourReplay] = useState(false);
   const {
     attempt,
     opening,
@@ -122,12 +130,16 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
     (attempt.status === "completed" ||
       lastRecord.round >= attempt.configuration.total_rounds);
 
+  const tourOpen =
+    tourActive && !isRoundFlow && phase !== "report" && phase !== "animating";
+
   return (
     <GridBackground>
       <PageTransition>
         {/*
-          Mobile/tablet: scrollable stack (content never crushed).
-          lg+: viewport-locked single-screen densify (classic beer-game parity).
+          Mobile/tablet: scrollable stack.
+          lg+: viewport-locked single-screen densify.
+          Full UI from round 1 (no progressive density).
         */}
         <main
           className={[
@@ -147,7 +159,10 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
               attempt={attempt}
               livePosition={pos}
               heatAccessCode={heatAccessCode}
-              onHowToPlayClick={() => setShowRules(true)}
+              onHowToPlayClick={() => {
+                setTourReplay(true);
+                setTourActive(true);
+              }}
             />
           </div>
 
@@ -161,7 +176,7 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
           )}
 
           {isRoundFlow && lastRecord ? (
-            <div className="flex-1 min-h-0 lg:overflow-y-auto overflow-x-hidden">
+            <div className="sv-phase-in flex-1 min-h-0 lg:overflow-y-auto overflow-x-hidden">
               <SupplyChainAnimation
                 record={lastRecord}
                 attempt={attempt}
@@ -171,48 +186,54 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
               />
             </div>
           ) : (
-            <div className="flex-1 min-h-0 flex flex-col gap-3 sm:gap-4 lg:overflow-hidden">
-              <div className="shrink-0">
+            /* Full shell every round: KPIs → dual graphs → round history + board */
+            <div className="sv-phase-in flex-1 min-h-0 flex flex-col gap-3 sm:gap-4 lg:overflow-hidden">
+              <div className="shrink-0" data-tour="kpis">
                 <StatusStrip
                   opening={opening}
                   lastRecord={null}
                   inventoryCost={config.inventory_cost_per_unit}
                   backlogCost={config.backlog_cost_per_unit}
                   cumulativeCost={attempt.cumulative_cost}
+                  startingInventory={config.starting_inventory}
                 />
               </div>
 
-              {/*
-                Chart : Game progress = 1.5 : 1 on lg+ (flex 3 / 2).
-                Mobile/tablet: fixed svh heights for reliable scroll layout.
-              */}
               <div className="flex-1 min-h-0 flex flex-col gap-3 sm:gap-4">
                 <div
+                  data-tour="graphs"
                   className={[
-                    "grid grid-cols-1 xl:grid-cols-[1.45fr_1fr] gap-3 sm:gap-4 min-h-0",
-                    /* mobile: fixed band */
+                    "min-h-0 min-w-0 flex flex-col",
+                    "h-[min(44svh,380px)] min-h-[220px]",
+                    "sm:h-[min(40svh,400px)] sm:min-h-[240px]",
+                    "lg:flex-[3] lg:h-auto lg:min-h-[200px]",
+                  ].join(" ")}
+                >
+                  <TrendPanel rounds={attempt.rounds} dense />
+                </div>
+
+                <div
+                  className={[
+                    "grid grid-cols-1 lg:grid-cols-[1fr_minmax(220px,300px)] gap-3 sm:gap-4 min-h-0",
                     "shrink-0",
-                    /* lg+: 1.5× the progress band */
-                    "lg:shrink lg:flex-[3] lg:min-h-[200px]",
+                    "lg:flex-[2] lg:min-h-[140px]",
                   ].join(" ")}
                 >
                   <div
-                    className={[
-                      "min-w-0 flex flex-col",
-                      "h-[min(42svh,360px)] min-h-[220px]",
-                      "sm:h-[min(38svh,380px)] sm:min-h-[240px]",
-                      "lg:h-full lg:min-h-0",
-                    ].join(" ")}
+                    data-tour="history"
+                    className="min-h-0 min-w-0 flex flex-col h-[min(36svh,220px)] lg:h-full lg:min-h-0"
                   >
-                    <TrendPanel rounds={attempt.rounds} dense />
+                    <RoundHistoryTable
+                      rounds={attempt.rounds}
+                      unit={unit}
+                      dense
+                    />
                   </div>
                   <div
                     className={[
                       "min-w-0 flex flex-col",
-                      "h-[min(32svh,220px)] min-h-[160px]",
-                      "sm:h-[min(28svh,240px)] sm:min-h-[180px]",
-                      "max-h-[260px]",
-                      "lg:h-full lg:min-h-0 lg:max-h-none",
+                      "h-[min(28svh,200px)] min-h-[140px]",
+                      "lg:h-full lg:min-h-0",
                     ].join(" ")}
                   >
                     <LiveLeaderboard
@@ -220,29 +241,6 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
                       global={globalBoard}
                       playerName={attempt.player_name}
                       dense
-                    />
-                  </div>
-                </div>
-
-                <div
-                  className={[
-                    "grid grid-cols-1 lg:grid-cols-[1fr_280px] xl:grid-cols-[1fr_300px] gap-3 sm:gap-4 min-h-0",
-                    "shrink-0",
-                    /* lg+: base unit — chart is 1.5× this */
-                    "lg:shrink lg:flex-[2] lg:min-h-[140px]",
-                  ].join(" ")}
-                >
-                  <div className="min-h-0 min-w-0 flex flex-col h-[min(36svh,220px)] lg:h-full lg:min-h-0">
-                    <RoundHistoryTable rounds={attempt.rounds} unit={unit} dense />
-                  </div>
-                  <div className="min-h-0 overflow-hidden lg:h-full">
-                    <PipelineStrip
-                      opening={opening}
-                      delay={config.delivery_delay}
-                      pipeline={attempt.pipeline}
-                      supplyRate={opening?.supplyRate}
-                      timelineUnit={unit}
-                      compact
                     />
                   </div>
                 </div>
@@ -257,7 +255,7 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
             value={orderInput}
             onChange={setOrderInput}
             onConfirm={() => void confirmOrder()}
-            disabled={submitting || phase !== "decide"}
+            disabled={submitting || phase !== "decide" || tourOpen}
             currentRound={attempt.current_round}
             deliveryDelay={config.delivery_delay}
             totalRounds={config.total_rounds}
@@ -269,18 +267,27 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
           />
         )}
 
-        {/* Coach recommendations / alerts — fixed overlay, same speech design as onboarding */}
-        {!isRoundFlow && (
+        {/* Mid-game coach — suppressed while spotlight tour runs */}
+        {!isRoundFlow && !tourOpen && (
           <PlayCoachOverlay
             attempt={attempt}
             phase={phase}
             lastRecord={lastRecord}
             completedRounds={completed}
+            earlyGame={false}
+            showFullAnalytics
           />
         )}
 
-        {showRules && (
-          <RulesPanel config={config} onClose={() => setShowRules(false)} />
+        {tourOpen && (
+          <PlayTour
+            config={config}
+            replay={tourReplay}
+            onComplete={() => {
+              setTourActive(false);
+              setTourReplay(false);
+            }}
+          />
         )}
       </PageTransition>
     </GridBackground>

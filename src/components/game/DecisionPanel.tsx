@@ -61,6 +61,7 @@ export function DecisionPanel({
     <div
       role="region"
       aria-label="Place order"
+      data-tour="order"
       className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 w-[min(720px,calc(100vw-1rem))] sm:w-[min(740px,calc(100vw-1.5rem))] pointer-events-none"
     >
       <div
@@ -146,7 +147,7 @@ export function DecisionPanel({
               aria-label="Decrease order"
               disabled={disabled || value <= 0}
               onClick={() => onChange(Math.max(0, value - 1))}
-              className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full transition-colors hover:bg-sv-cyan-tint/70 disabled:opacity-35 sm:h-10 sm:w-10"
+              className="sv-press flex h-11 w-11 items-center justify-center rounded-full hover:bg-sv-cyan-tint/70 disabled:opacity-35 sm:h-10 sm:w-10"
               style={{
                 color: "var(--sv-teal-mid)",
                 fontSize: 22,
@@ -192,7 +193,8 @@ export function DecisionPanel({
                 color: "var(--sv-ink)",
                 textAlign: "center",
                 letterSpacing: "-0.02em",
-                transition: "width 120ms ease",
+                // Width only — interruptible while digits grow/shrink
+                transition: "width 120ms var(--sv-ease-out, ease), color 140ms ease",
                 borderRadius: 0,
               }}
             />
@@ -201,7 +203,7 @@ export function DecisionPanel({
               aria-label="Increase order"
               disabled={disabled || value >= maxOrder}
               onClick={() => onChange(Math.min(maxOrder, value + 1))}
-              className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full transition-colors hover:bg-sv-cyan-tint/70 disabled:opacity-35 sm:h-10 sm:w-10"
+              className="sv-press flex h-11 w-11 items-center justify-center rounded-full hover:bg-sv-cyan-tint/70 disabled:opacity-35 sm:h-10 sm:w-10"
               style={{
                 color: "var(--sv-teal-mid)",
                 fontSize: 22,

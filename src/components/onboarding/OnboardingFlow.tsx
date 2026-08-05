@@ -18,38 +18,45 @@ import {
   DollarSign,
 } from "@/components/cyan/PixelIcons";
 import { useAttemptStore } from "@/store/useAttemptStore";
-// getState used in host start fallback for heatAccessCode
 import { DEFAULT_CONFIG, type GameConfig } from "@/engine";
 import { loadAdminConfig } from "@/lib/adminConfigStore";
 import { api, USE_MOCK } from "@/services/api";
-// USE_MOCK shown on host screen — multiplayer needs live API across devices
 import {
   PERSONA_AVATAR_PLACEHOLDER,
   PERSONAS,
   personaBySlug,
   type PersonaSlug,
 } from "@/lib/personas";
-import { writePlayerProfile } from "@/lib/playerProfile";
+import { readPlayerProfile, writePlayerProfile } from "@/lib/playerProfile";
 import { CoachSpeech } from "@/components/coach";
+import { OnboardingWarehouseTour } from "@/components/onboarding/OnboardingWarehouseTour";
+import { hasCompletedPlayTour } from "@/lib/playTour";
 
 // ---------------------------------------------------------
-// Coach lines (Segment-style left coach + chat bubble)
+// Coach lines
 // ---------------------------------------------------------
 
 const COACH_LINES: Record<string, string> = {
   welcome: "I'm your coach. Before we open the warehouse — let's get you set up.",
-  identity: "Pick a face and a name. Cosmetic only — scoring stays fair.",
-  mode: "Solo to practice, host a heat for your class, or join with a code.",
+  mode: "Solo practice is the fastest path. Host or join when you're playing with a group.",
+  practiceFast: "Pick a face and a name — cosmetic only. Then we open the warehouse.",
+  identity:
+    "Avatar and name are cosmetic only — they never change scoring or fairness.",
   heatCode: "Ask your host for the code. Then we can join the heat.",
-  hostShare: "Share this code with your group. They join from the home screen.",
+  hostShare:
+    "Share the big code or the QR with your class. Wait for players, then enter.",
   official:
-    "Official locks one attempt per email for the event board. Practice stays unlimited.",
+    "Official is one attempt per email — permanent for this heat. Practice is unlimited.",
+  officialConfirm:
+    "Last chance. Official cannot be undone for this email on this heat.",
+  tutorial: "I'll spotlight the warehouse — inventory, history, charts, and your order dock.",
   loading: "Locking in your setup. Warehouse opens in a second…",
 };
 
 type PlayMode = "solo" | "host" | "heat";
 
 const IDENTITY_KEY = "retailer-challenge-player-identity";
+const DEFAULT_PERSONA: PersonaSlug = "the-analyst";
 
 function readSavedIdentity(): string {
   if (typeof window === "undefined") return "";
@@ -67,6 +74,16 @@ function saveIdentity(value: string) {
     else sessionStorage.removeItem(IDENTITY_KEY);
   } catch {
     /* ignore */
+  }
+}
+
+function readQueryHeatCode(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const code = new URLSearchParams(window.location.search).get("code");
+    return code ? code.trim().toUpperCase() : "";
+  } catch {
+    return "";
   }
 }
 
@@ -128,7 +145,7 @@ function SelectionCard({
       type="button"
       onClick={onClick}
       className={`w-full flex items-center p-4 rounded-xl border-[1.5px] cursor-pointer transition-all duration-200 text-left ${
-        active 
+        active
           ? "border-sv-teal-mid bg-sv-cyan-tint text-sv-teal-mid"
           : "border-sv-border bg-white/70 text-sv-ink hover:border-sv-teal-mid/40"
       }`}
@@ -139,8 +156,30 @@ function SelectionCard({
   );
 }
 
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: "16px",
+        borderRadius: 12,
+        border: "1.5px solid var(--sv-border)",
+        background: "rgba(255,255,255,0.5)",
+        fontFamily: FO,
+        fontWeight: 600,
+        fontSize: 15,
+        color: "var(--sv-text-secondary)",
+        cursor: "pointer",
+      }}
+    >
+      Back
+    </button>
+  );
+}
+
 // ---------------------------------------------------------
-// Screens — Welcome → Identity → Mode → Play
+// Screens
 // ---------------------------------------------------------
 
 function WelcomeScreen({ onNext, config }: { onNext: () => void; config: GameConfig }) {
@@ -172,7 +211,8 @@ function WelcomeScreen({ onNext, config }: { onNext: () => void; config: GameCon
           marginBottom: 32,
         }}
       >
-        Step into the shoes of a supply chain manager. Can you balance costs and satisfy demand?
+        Step into the shoes of a supply chain manager. Can you balance costs and satisfy
+        demand?
       </p>
 
       <div className="grid grid-cols-3 gap-2 mb-8 text-left">
@@ -200,7 +240,352 @@ function WelcomeScreen({ onNext, config }: { onNext: () => void; config: GameCon
   );
 }
 
-/** Combined avatar + name — one Identity step. */
+function ModeScreen({
+  value,
+  onChange,
+  onNext,
+}: {
+  value: PlayMode;
+  onChange: (v: PlayMode) => void;
+  onNext: () => void;
+}) {
+  const options: {
+    id: PlayMode;
+    title: string;
+    blurb: string;
+    icon: React.ReactNode;
+  }[] = [
+    {
+      id: "solo",
+      title: "Solo Practice",
+      blurb: "Fastest path — name, coach walkthrough, play.",
+      icon: <Target size={20} color="currentColor" />,
+    },
+    {
+      id: "host",
+      title: "Host a Heat",
+      blurb: "Create a code and invite up to 4 players.",
+      icon: <Users size={20} color="currentColor" />,
+    },
+    {
+      id: "heat",
+      title: "Join a Heat",
+      blurb: "Enter a code from your host or instructor.",
+      icon: <Package size={20} color="currentColor" />,
+    },
+  ];
+
+  return (
+    <GlassCard className="p-4">
+      <h2
+        style={{
+          fontFamily: FO,
+          fontWeight: 700,
+          fontSize: 24,
+          color: "var(--sv-ink)",
+          marginBottom: 24,
+        }}
+      >
+        How do you want to play?
+      </h2>
+      <div className="flex flex-col gap-3 mb-8">
+        {options.map((opt) => (
+          <SelectionCard key={opt.id} active={value === opt.id} onClick={() => onChange(opt.id)}>
+            <div className="flex items-center gap-3 w-full">
+              <div
+                style={{
+                  background: value === opt.id ? "var(--sv-teal-mid)" : "var(--sv-border)",
+                  color: "white",
+                  padding: 8,
+                  borderRadius: 8,
+                }}
+              >
+                {opt.icon}
+              </div>
+              <div className="text-left flex-1">
+                <div style={{ fontFamily: FO, fontWeight: 600, fontSize: 15 }}>{opt.title}</div>
+                <div
+                  style={{
+                    fontFamily: FO,
+                    fontSize: 12,
+                    color: "var(--sv-text-muted)",
+                    marginTop: 2,
+                  }}
+                >
+                  {opt.blurb}
+                </div>
+              </div>
+            </div>
+          </SelectionCard>
+        ))}
+      </div>
+      <GameButton size="lg" style={{ width: "100%" }} onClick={onNext}>
+        Continue
+      </GameButton>
+    </GlassCard>
+  );
+}
+
+/** Solo practice fast path: avatar + name on one screen → start. */
+function PracticeFastScreen({
+  persona,
+  name,
+  onPersonaChange,
+  onNameChange,
+  onStart,
+  onBack,
+  onHoverPersona,
+}: {
+  persona: PersonaSlug | "";
+  name: string;
+  onPersonaChange: (slug: PersonaSlug) => void;
+  onNameChange: (v: string) => void;
+  onStart: () => void;
+  onBack: () => void;
+  onHoverPersona?: (slug: PersonaSlug | null) => void;
+}) {
+  const selected = personaBySlug(persona);
+  const canStart = !!persona && name.trim().length > 0;
+
+  return (
+    <GlassCard className="p-4">
+      <h2
+        style={{
+          fontFamily: FO,
+          fontWeight: 700,
+          fontSize: 24,
+          color: "var(--sv-ink)",
+          marginBottom: 4,
+          textAlign: "center",
+        }}
+      >
+        Practice run
+      </h2>
+      <p
+        style={{
+          fontFamily: FO,
+          fontSize: 14,
+          color: "var(--sv-text-secondary)",
+          marginBottom: 8,
+          textAlign: "center",
+          lineHeight: 1.45,
+        }}
+      >
+        Pick a face and a name — then start. One screen, no extra steps.
+      </p>
+      <p
+        style={{
+          fontFamily: FO,
+          fontSize: 12,
+          fontWeight: 700,
+          color: "var(--sv-teal-mid)",
+          marginBottom: 20,
+          textAlign: "center",
+          letterSpacing: "0.02em",
+        }}
+      >
+        Cosmetic — never affects score or fairness
+      </p>
+
+      <span
+        style={{
+          display: "block",
+          fontFamily: FO,
+          fontSize: 10,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          color: "var(--sv-teal-mid)",
+          marginBottom: 10,
+        }}
+      >
+        Avatar
+      </span>
+      <div
+        role="radiogroup"
+        aria-label="Choose a persona avatar"
+        className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6"
+        onMouseLeave={() => onHoverPersona?.(null)}
+      >
+        {PERSONAS.map((p) => {
+          const active = persona === p.slug;
+          return (
+            <button
+              key={p.slug}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              aria-label={p.name}
+              onClick={() => onPersonaChange(p.slug)}
+              onPointerDown={(e) => {
+                // Instant select on press (no double-tap feel on touch).
+                if (e.pointerType === "touch" || e.pointerType === "pen") {
+                  onPersonaChange(p.slug);
+                }
+              }}
+              onMouseEnter={() => onHoverPersona?.(p.slug)}
+              onFocus={() => onHoverPersona?.(p.slug)}
+              className="touch-manipulation select-none"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 10,
+                borderRadius: 14,
+                border: active
+                  ? "2.5px solid var(--sv-teal-mid)"
+                  : "1.5px solid var(--sv-border)",
+                background: active ? "var(--sv-cyan-tint)" : "rgba(255,255,255,0.7)",
+                cursor: "pointer",
+                // Only animate inactive hover — active state is instant
+                transition: active
+                  ? "none"
+                  : "border-color 0.12s ease, background 0.12s ease",
+                boxShadow: active
+                  ? "0 0 0 3px color-mix(in srgb, var(--sv-teal-mid) 22%, transparent)"
+                  : "none",
+                transform: active ? "scale(1.02)" : "scale(1)",
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              <span
+                style={{
+                  width: 108,
+                  height: 108,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                  borderRadius: 12,
+                  background: "transparent",
+                  pointerEvents: "none",
+                }}
+              >
+                <Image
+                  src={p.avatarSrc}
+                  alt=""
+                  width={108}
+                  height={108}
+                  unoptimized
+                  draggable={false}
+                  style={{
+                    width: 108,
+                    height: 108,
+                    objectFit: "contain",
+                    imageRendering: "pixelated",
+                  }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = PERSONA_AVATAR_PLACEHOLDER;
+                  }}
+                />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <label
+        htmlFor="practice-name"
+        style={{
+          display: "block",
+          fontFamily: FO,
+          fontSize: 10,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          color: "var(--sv-teal-mid)",
+          marginBottom: 8,
+        }}
+      >
+        Display name
+      </label>
+      <input
+        id="practice-name"
+        value={name}
+        onChange={(e) => onNameChange(e.target.value)}
+        placeholder="e.g. Ava"
+        maxLength={24}
+        style={{
+          width: "100%",
+          fontFamily: FO,
+          fontSize: 18,
+          padding: "14px 16px",
+          borderRadius: 12,
+          border: "2px solid var(--sv-border)",
+          background: "rgba(255,255,255,0.8)",
+          color: "var(--sv-ink)",
+          marginBottom: 16,
+          outline: "none",
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && canStart) onStart();
+        }}
+      />
+
+      {selected && name.trim() && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 20,
+            padding: "10px 12px",
+            borderRadius: 12,
+            border: "1px solid var(--sv-border)",
+            background: "rgba(255,255,255,0.6)",
+          }}
+        >
+          <Image
+            src={selected.avatarSrc}
+            alt=""
+            width={40}
+            height={40}
+            unoptimized
+            style={{
+              width: 40,
+              height: 40,
+              objectFit: "contain",
+              imageRendering: "pixelated",
+            }}
+          />
+          <div className="min-w-0">
+            <p
+              style={{
+                fontFamily: FO,
+                fontSize: 14,
+                fontWeight: 700,
+                color: "var(--sv-ink)",
+                margin: 0,
+              }}
+              className="truncate"
+            >
+              {name.trim()}
+            </p>
+            <p
+              style={{
+                fontFamily: FO,
+                fontSize: 11,
+                color: "var(--sv-text-muted)",
+                margin: 0,
+              }}
+            >
+              Board label only
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <BackButton onClick={onBack} />
+        <GameButton size="lg" style={{ flex: 1 }} disabled={!canStart} onClick={onStart}>
+          Start practice
+        </GameButton>
+      </div>
+    </GlassCard>
+  );
+}
+
+/** Combined avatar + name — heat/host path only. */
 function IdentityScreen({
   persona,
   name,
@@ -238,11 +623,25 @@ function IdentityScreen({
           fontFamily: FO,
           fontSize: 14,
           color: "var(--sv-text-secondary)",
-          marginBottom: 20,
+          marginBottom: 8,
           textAlign: "center",
+          lineHeight: 1.45,
         }}
       >
-        Avatar and name for the board. Doesn&apos;t change scoring.
+        Avatar and name for the board only.
+      </p>
+      <p
+        style={{
+          fontFamily: FO,
+          fontSize: 12,
+          fontWeight: 700,
+          color: "var(--sv-teal-mid)",
+          marginBottom: 20,
+          textAlign: "center",
+          letterSpacing: "0.02em",
+        }}
+      >
+        Cosmetic — never affects score or fairness
       </p>
 
       <span
@@ -275,18 +674,33 @@ function IdentityScreen({
               aria-checked={active}
               aria-label={p.name}
               onClick={() => onPersonaChange(p.slug)}
+              onPointerDown={(e) => {
+                if (e.pointerType === "touch" || e.pointerType === "pen") {
+                  onPersonaChange(p.slug);
+                }
+              }}
               onMouseEnter={() => onHoverPersona?.(p.slug)}
               onFocus={() => onHoverPersona?.(p.slug)}
+              className="touch-manipulation select-none"
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 padding: 10,
                 borderRadius: 14,
-                border: active ? "2px solid var(--sv-teal-mid)" : "1.5px solid var(--sv-border)",
+                border: active
+                  ? "2.5px solid var(--sv-teal-mid)"
+                  : "1.5px solid var(--sv-border)",
                 background: active ? "var(--sv-cyan-tint)" : "rgba(255,255,255,0.7)",
                 cursor: "pointer",
-                transition: "all 0.2s ease",
+                transition: active
+                  ? "none"
+                  : "border-color 0.12s ease, background 0.12s ease",
+                boxShadow: active
+                  ? "0 0 0 3px color-mix(in srgb, var(--sv-teal-mid) 22%, transparent)"
+                  : "none",
+                transform: active ? "scale(1.02)" : "scale(1)",
+                WebkitTapHighlightColor: "transparent",
               }}
             >
               <span
@@ -299,6 +713,7 @@ function IdentityScreen({
                   overflow: "hidden",
                   borderRadius: 12,
                   background: "transparent",
+                  pointerEvents: "none",
                 }}
               >
                 <Image
@@ -307,6 +722,7 @@ function IdentityScreen({
                   width={108}
                   height={108}
                   unoptimized
+                  draggable={false}
                   style={{
                     width: 108,
                     height: 108,
@@ -380,7 +796,12 @@ function IdentityScreen({
             width={40}
             height={40}
             unoptimized
-            style={{ width: 40, height: 40, objectFit: "contain", imageRendering: "pixelated" }}
+            style={{
+              width: 40,
+              height: 40,
+              objectFit: "contain",
+              imageRendering: "pixelated",
+            }}
           />
           <div className="min-w-0">
             <p
@@ -395,82 +816,21 @@ function IdentityScreen({
             >
               {name.trim()}
             </p>
+            <p
+              style={{
+                fontFamily: FO,
+                fontSize: 11,
+                color: "var(--sv-text-muted)",
+                margin: 0,
+              }}
+            >
+              Board label only
+            </p>
           </div>
         </div>
       )}
 
       <GameButton size="lg" style={{ width: "100%" }} disabled={!canContinue} onClick={onNext}>
-        Continue
-      </GameButton>
-    </GlassCard>
-  );
-}
-
-function ModeScreen({
-  value,
-  onChange,
-  onNext,
-}: {
-  value: PlayMode;
-  onChange: (v: PlayMode) => void;
-  onNext: () => void;
-}) {
-  const options: {
-    id: PlayMode;
-    title: string;
-    blurb: string;
-    icon: React.ReactNode;
-  }[] = [
-    {
-      id: "solo",
-      title: "Solo Practice",
-      blurb: "Learn the ropes on your own heat.",
-      icon: <Target size={20} color="currentColor" />,
-    },
-    {
-      id: "host",
-      title: "Host a Heat",
-      blurb: "Create a code and invite up to 4 players.",
-      icon: <Users size={20} color="currentColor" />,
-    },
-    {
-      id: "heat",
-      title: "Join a Heat",
-      blurb: "Enter a code from your host or instructor.",
-      icon: <Package size={20} color="currentColor" />,
-    },
-  ];
-
-  return (
-    <GlassCard className="p-4">
-      <h2 style={{ fontFamily: FO, fontWeight: 700, fontSize: 24, color: "var(--sv-ink)", marginBottom: 24 }}>
-        How do you want to play?
-      </h2>
-      <div className="flex flex-col gap-3 mb-8">
-        {options.map((opt) => (
-          <SelectionCard key={opt.id} active={value === opt.id} onClick={() => onChange(opt.id)}>
-            <div className="flex items-center gap-3 w-full">
-              <div
-                style={{
-                  background: value === opt.id ? "var(--sv-teal-mid)" : "var(--sv-border)",
-                  color: "white",
-                  padding: 8,
-                  borderRadius: 8,
-                }}
-              >
-                {opt.icon}
-              </div>
-              <div className="text-left flex-1">
-                <div style={{ fontFamily: FO, fontWeight: 600, fontSize: 15 }}>{opt.title}</div>
-                <div style={{ fontFamily: FO, fontSize: 12, color: "var(--sv-text-muted)", marginTop: 2 }}>
-                  {opt.blurb}
-                </div>
-              </div>
-            </div>
-          </SelectionCard>
-        ))}
-      </div>
-      <GameButton size="lg" style={{ width: "100%" }} onClick={onNext}>
         Continue
       </GameButton>
     </GlassCard>
@@ -490,10 +850,25 @@ function HeatCodeScreen({
 }) {
   return (
     <GlassCard className="p-4">
-      <h2 style={{ fontFamily: FO, fontWeight: 700, fontSize: 24, color: "var(--sv-ink)", marginBottom: 8 }}>
+      <h2
+        style={{
+          fontFamily: FO,
+          fontWeight: 700,
+          fontSize: 24,
+          color: "var(--sv-ink)",
+          marginBottom: 8,
+        }}
+      >
         Enter Heat Code
       </h2>
-      <p style={{ fontFamily: FO, fontSize: 14, color: "var(--sv-text-secondary)", marginBottom: 24 }}>
+      <p
+        style={{
+          fontFamily: FO,
+          fontSize: 14,
+          color: "var(--sv-text-secondary)",
+          marginBottom: 24,
+        }}
+      >
         Ask your instructor or host for the access code.
       </p>
       <input
@@ -520,23 +895,7 @@ function HeatCodeScreen({
         }}
       />
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onBack}
-          style={{
-            padding: "16px",
-            borderRadius: 12,
-            border: "1.5px solid var(--sv-border)",
-            background: "rgba(255,255,255,0.5)",
-            fontFamily: FO,
-            fontWeight: 600,
-            fontSize: 15,
-            color: "var(--sv-text-secondary)",
-            cursor: "pointer",
-          }}
-        >
-          Back
-        </button>
+        <BackButton onClick={onBack} />
         <GameButton size="lg" style={{ flex: 1 }} disabled={!value.trim()} onClick={onNext}>
           Continue
         </GameButton>
@@ -545,7 +904,7 @@ function HeatCodeScreen({
   );
 }
 
-/** Host path: create heat, show shareable code, then enter as first player. */
+/** Host path: big code, copy, QR, waiting for players. */
 function HostShareScreen({
   accessCode,
   heatId,
@@ -564,15 +923,30 @@ function HostShareScreen({
   onBack: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [origin] = useState(() =>
+    typeof window !== "undefined" ? window.location.origin : "",
+  );
 
   useEffect(() => {
-    // Always try create when we don't have a code yet (don't gate on store error —
-    // a prior failed join would block hosting forever).
     if (!accessCode && !creating) {
       onCreate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- create once on mount
   }, []);
+
+  const joinUrl =
+    accessCode && origin
+      ? `${origin}/?code=${encodeURIComponent(accessCode)}`
+      : accessCode
+        ? `code=${accessCode}`
+        : "";
+
+  const qrSrc =
+    accessCode &&
+    `https://api.qrserver.com/v1/create-qr-code/?size=168x168&margin=8&data=${encodeURIComponent(
+      joinUrl || accessCode,
+    )}`;
 
   const copyCode = async () => {
     if (!accessCode) return;
@@ -581,7 +955,18 @@ function HostShareScreen({
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* fallback: select via prompt-less ignore */
+      /* ignore */
+    }
+  };
+
+  const copyLink = async () => {
+    if (!joinUrl) return;
+    try {
+      await navigator.clipboard.writeText(joinUrl);
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      /* ignore */
     }
   };
 
@@ -596,7 +981,7 @@ function HostShareScreen({
           marginBottom: 8,
         }}
       >
-        Your heat code
+        Share your heat
       </h2>
       <p
         style={{
@@ -604,9 +989,10 @@ function HostShareScreen({
           fontSize: 14,
           color: "var(--sv-text-secondary)",
           marginBottom: 16,
+          lineHeight: 1.45,
         }}
       >
-        Share this with your group. Up to 4 players can join, including you.
+        Project this screen. Up to 4 players can join, including you.
       </p>
 
       {USE_MOCK && (
@@ -625,10 +1011,9 @@ function HostShareScreen({
             lineHeight: 1.4,
           }}
         >
-          Mock mode: this code only works in <strong>this browser</strong>. For
-          classmates on other devices, set{" "}
-          <code style={{ fontSize: 11 }}>NEXT_PUBLIC_USE_MOCK=false</code> in{" "}
-          <code style={{ fontSize: 11 }}>.env.local</code> and restart the app.
+          Mock mode: this code only works in <strong>this browser</strong>. For classmates
+          on other devices, set{" "}
+          <code style={{ fontSize: 11 }}>NEXT_PUBLIC_USE_MOCK=false</code> and restart.
         </p>
       )}
 
@@ -644,36 +1029,102 @@ function HostShareScreen({
             style={{
               fontFamily: FO,
               fontWeight: 800,
-              fontSize: 36,
-              letterSpacing: "0.18em",
+              fontSize: "clamp(2rem, 8vw, 2.75rem)",
+              letterSpacing: "0.2em",
               color: "var(--sv-teal-mid)",
-              padding: "20px 16px",
+              padding: "24px 16px",
               borderRadius: 16,
-              border: "1.5px solid var(--sv-border)",
+              border: "2px solid var(--sv-teal-mid)",
               background: "var(--sv-cyan-tint)",
               marginBottom: 12,
               userSelect: "all",
+              lineHeight: 1.1,
             }}
+            aria-label={`Heat code ${accessCode}`}
           >
             {accessCode}
           </div>
-          <button
-            type="button"
-            onClick={() => void copyCode()}
+
+          <div className="flex flex-col sm:flex-row gap-2 mb-5">
+            <GameButton size="md" style={{ flex: 1 }} onClick={() => void copyCode()}>
+              {copied ? "Copied!" : "Copy code"}
+            </GameButton>
+            <GameButton
+              size="md"
+              variant="secondary"
+              style={{ flex: 1 }}
+              onClick={() => void copyLink()}
+              disabled={!joinUrl}
+            >
+              {linkCopied ? "Link copied!" : "Copy join link"}
+            </GameButton>
+          </div>
+
+          {qrSrc && (
+            <div
+              className="mx-auto mb-4 p-3 rounded-2xl inline-block"
+              style={{
+                border: "1.5px solid var(--sv-border)",
+                background: "white",
+              }}
+            >
+              {/* External QR image — classroom share; no new npm dep */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={qrSrc}
+                alt={`QR code for heat ${accessCode}`}
+                width={168}
+                height={168}
+                style={{ display: "block", imageRendering: "pixelated" }}
+              />
+              <p
+                style={{
+                  fontFamily: FO,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "var(--sv-text-muted)",
+                  marginTop: 8,
+                  marginBottom: 0,
+                }}
+              >
+                Scan to open join link
+              </p>
+            </div>
+          )}
+
+          <div
+            className="mb-5 p-3 rounded-xl text-left"
             style={{
-              fontFamily: FO,
-              fontSize: 13,
-              fontWeight: 700,
-              color: "var(--sv-teal-mid)",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              marginBottom: 24,
-              textDecoration: "underline",
+              border: "1.5px dashed var(--sv-border)",
+              background: "rgba(255,255,255,0.55)",
             }}
           >
-            {copied ? "Copied" : "Copy code"}
-          </button>
+            <p
+              style={{
+                fontFamily: FO,
+                fontSize: 12,
+                fontWeight: 700,
+                color: "var(--sv-teal-mid)",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                margin: "0 0 6px",
+              }}
+            >
+              Waiting for players
+            </p>
+            <p
+              style={{
+                fontFamily: FO,
+                fontSize: 13,
+                color: "var(--sv-text-secondary)",
+                margin: 0,
+                lineHeight: 1.45,
+              }}
+            >
+              Classmates open the home screen → Join a Heat → enter this code (or scan the
+              QR). When the room is ready, enter and play.
+            </p>
+          </div>
         </>
       )}
 
@@ -740,7 +1191,15 @@ function OfficialScreen({
   onNext: () => void;
   onBack: () => void;
 }) {
-  const canContinue = !isOfficial || identity.trim().includes("@");
+  const [ackOfficial, setAckOfficial] = useState(false);
+  const emailOk = !isOfficial || identity.trim().includes("@");
+  const canContinue = emailOk && (!isOfficial || ackOfficial);
+
+  const pickPractice = () => {
+    setAckOfficial(false);
+    onOfficialChange(false);
+  };
+  const pickOfficial = () => onOfficialChange(true);
 
   return (
     <GlassCard className="p-4">
@@ -761,25 +1220,43 @@ function OfficialScreen({
           fontSize: 14,
           color: "var(--sv-text-secondary)",
           marginBottom: 20,
+          lineHeight: 1.45,
         }}
       >
-        Official attempts count once per person for the event. Practice does not lock you out.
+        Official attempts count once per person for the event. Practice does not lock you
+        out.
       </p>
 
       <div className="flex flex-col gap-3 mb-6">
-        <SelectionCard active={!isOfficial} onClick={() => onOfficialChange(false)}>
+        <SelectionCard active={!isOfficial} onClick={pickPractice}>
           <div className="text-left">
             <div style={{ fontFamily: FO, fontWeight: 600, fontSize: 15 }}>Practice</div>
-            <div style={{ fontFamily: FO, fontSize: 12, color: "var(--sv-text-muted)", marginTop: 2 }}>
+            <div
+              style={{
+                fontFamily: FO,
+                fontSize: 12,
+                color: "var(--sv-text-muted)",
+                marginTop: 2,
+              }}
+            >
               Unlimited retries. Not ranked as official.
             </div>
           </div>
         </SelectionCard>
-        <SelectionCard active={isOfficial} onClick={() => onOfficialChange(true)}>
+        <SelectionCard active={isOfficial} onClick={pickOfficial}>
           <div className="text-left">
-            <div style={{ fontFamily: FO, fontWeight: 600, fontSize: 15 }}>Official attempt</div>
-            <div style={{ fontFamily: FO, fontSize: 12, color: "var(--sv-text-muted)", marginTop: 2 }}>
-              One per email for this heat. Choose carefully.
+            <div style={{ fontFamily: FO, fontWeight: 600, fontSize: 15 }}>
+              Official attempt
+            </div>
+            <div
+              style={{
+                fontFamily: FO,
+                fontSize: 12,
+                color: "var(--sv-text-muted)",
+                marginTop: 2,
+              }}
+            >
+              One per email for this heat. Cannot be undone.
             </div>
           </div>
         </SelectionCard>
@@ -787,6 +1264,39 @@ function OfficialScreen({
 
       {isOfficial && (
         <>
+          <div
+            role="alert"
+            className="mb-4 p-3 rounded-xl text-left"
+            style={{
+              border: "1.5px solid var(--sv-warning)",
+              background: "rgba(180, 83, 9, 0.08)",
+            }}
+          >
+            <p
+              style={{
+                fontFamily: FO,
+                fontSize: 13,
+                fontWeight: 700,
+                color: "var(--sv-warning)",
+                margin: "0 0 6px",
+              }}
+            >
+              This cannot be undone
+            </p>
+            <p
+              style={{
+                fontFamily: FO,
+                fontSize: 13,
+                color: "var(--sv-text-secondary)",
+                margin: 0,
+                lineHeight: 1.45,
+              }}
+            >
+              Starting an official attempt locks this email for the heat. You will not get a
+              second official try if you mis-order or refresh mid-game.
+            </p>
+          </div>
+
           <label
             htmlFor="player-identity"
             style={{
@@ -818,36 +1328,35 @@ function OfficialScreen({
               border: "2px solid var(--sv-border)",
               background: "rgba(255,255,255,0.8)",
               color: "var(--sv-ink)",
-              marginBottom: 20,
+              marginBottom: 14,
               outline: "none",
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && canContinue) onNext();
             }}
           />
+
+          <label
+            className="flex items-start gap-2.5 mb-5 cursor-pointer text-left"
+            style={{ fontFamily: FO }}
+          >
+            <input
+              type="checkbox"
+              checked={ackOfficial}
+              onChange={(e) => setAckOfficial(e.target.checked)}
+              style={{ marginTop: 3, accentColor: "var(--sv-teal-mid)" }}
+            />
+            <span style={{ fontSize: 13, color: "var(--sv-ink)", lineHeight: 1.4 }}>
+              I understand this is my only official attempt for this heat with this email.
+            </span>
+          </label>
         </>
       )}
 
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onBack}
-          style={{
-            padding: "16px",
-            borderRadius: 12,
-            border: "1.5px solid var(--sv-border)",
-            background: "rgba(255,255,255,0.5)",
-            fontFamily: FO,
-            fontWeight: 600,
-            fontSize: 15,
-            color: "var(--sv-text-secondary)",
-            cursor: "pointer",
-          }}
-        >
-          Back
-        </button>
+        <BackButton onClick={onBack} />
         <GameButton size="lg" style={{ flex: 1 }} disabled={!canContinue} onClick={onNext}>
-          Continue
+          {isOfficial ? "Lock in & continue" : "Continue"}
         </GameButton>
       </div>
     </GlassCard>
@@ -867,9 +1376,11 @@ function LoadingScreen({
   submitting: boolean;
   error: string | null;
 }) {
-  // Always attempt start on mount. Do NOT gate on store `error` — a leftover
-  // "Heat not found" from a previous try would skip start forever.
+  const startedRef = React.useRef(false);
   useEffect(() => {
+    // Dev Strict Mode runs effects twice on the same instance — fire start once.
+    if (startedRef.current) return;
+    startedRef.current = true;
     void onStart();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once per visit to this step
   }, []);
@@ -881,7 +1392,15 @@ function LoadingScreen({
           <div className="w-10 h-10 border-4 border-t-[var(--sv-teal-mid)] border-b-[var(--sv-teal-mid)] border-l-transparent border-r-transparent rounded-full animate-spin" />
         </div>
       )}
-      <h2 style={{ fontFamily: FO, fontWeight: 700, fontSize: 20, color: "var(--sv-ink)", marginBottom: 8 }}>
+      <h2
+        style={{
+          fontFamily: FO,
+          fontWeight: 700,
+          fontSize: 20,
+          color: "var(--sv-ink)",
+          marginBottom: 8,
+        }}
+      >
         {error
           ? "Couldn’t start"
           : submitting
@@ -920,19 +1439,17 @@ function LoadingScreen({
 }
 
 // ---------------------------------------------------------
-// Main flow: Welcome → Identity → Mode → (Heat code) → Play
+// Main flow
+// Welcome → Mode →
+//   solo: PracticeFast → [Tutorial?] → Loading
+//   host: Identity → HostShare → Official → [Tutorial?] → Loading
+//   heat: Identity → HeatCode → Official → [Tutorial?] → Loading
 // ---------------------------------------------------------
 
 export default function OnboardingFlow() {
   const router = useRouter();
-  const {
-    startSolo,
-    joinHeat,
-    createHostedHeat,
-    submitting,
-    error,
-    reset,
-  } = useAttemptStore();
+  const { startSolo, joinHeat, createHostedHeat, submitting, error, reset } =
+    useAttemptStore();
   const [gameConfig, setGameConfig] = useState<GameConfig>(DEFAULT_CONFIG);
   const [hoverPersona, setHoverPersona] = useState<PersonaSlug | null>(null);
   const [hostedHeat, setHostedHeat] = useState<{
@@ -941,6 +1458,13 @@ export default function OnboardingFlow() {
   } | null>(null);
   const [hostCreating, setHostCreating] = useState(false);
   const [hostError, setHostError] = useState<string | null>(null);
+  /**
+   * Focused-element warehouse tour (dark overlay + spotlights).
+   * Same PlayTour as in-game How to play — runs once during onboarding.
+   */
+  const [tutorialGate] = useState<"needed" | "skip">(() =>
+    typeof window !== "undefined" && !hasCompletedPlayTour() ? "needed" : "skip",
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -964,14 +1488,33 @@ export default function OnboardingFlow() {
     };
   }, []);
 
-  const [data, setData] = useState(() => ({
-    persona: "" as PersonaSlug | "",
-    name: "",
-    mode: "solo" as PlayMode,
-    heatCode: "",
-    isOfficial: false,
-    playerIdentity: readSavedIdentity(),
-  }));
+  const [data, setData] = useState(() => {
+    if (typeof window === "undefined") {
+      return {
+        persona: "" as PersonaSlug | "",
+        name: "",
+        mode: "solo" as PlayMode,
+        heatCode: "",
+        isOfficial: false,
+        playerIdentity: "",
+      };
+    }
+    const profile = readPlayerProfile();
+    const code = readQueryHeatCode();
+    return {
+      persona: (profile.persona ?? "") as PersonaSlug | "",
+      name: profile.name ?? "",
+      mode: (code ? "heat" : "solo") as PlayMode,
+      heatCode: code,
+      isOfficial: false,
+      playerIdentity: readSavedIdentity(),
+    };
+  });
+
+  // welcome(0) → mode(1) → identity(2) when joining via QR/link
+  const [stepIndex, setStepIndex] = useState(() =>
+    typeof window !== "undefined" && readQueryHeatCode() ? 2 : 0,
+  );
 
   const updateData = <K extends keyof typeof data>(key: K, val: (typeof data)[K]) => {
     setData((prev) => {
@@ -979,7 +1522,6 @@ export default function OnboardingFlow() {
       if (key === "mode" && val === "solo") next.isOfficial = false;
       return next;
     });
-    // Persist immediately so the play header can show the chosen avatar.
     if (key === "persona" || key === "name") {
       const nextPersona = key === "persona" ? (val as PersonaSlug | "") : data.persona;
       const nextName = key === "name" ? String(val) : data.name;
@@ -993,15 +1535,14 @@ export default function OnboardingFlow() {
     if (key === "playerIdentity") {
       saveIdentity(String(val).trim());
     }
-    // Changing mode drops any staged host heat so codes don't leak across modes.
     if (key === "mode") {
       setHostedHeat(null);
       setHostError(null);
     }
   };
 
-  const [stepIndex, setStepIndex] = useState(0);
   const next = () => setStepIndex((s) => s + 1);
+  const back = () => setStepIndex((s) => Math.max(0, s - 1));
 
   const handleCreateHostedHeat = async () => {
     setHostCreating(true);
@@ -1016,11 +1557,26 @@ export default function OnboardingFlow() {
     }
   };
 
-  /** Shared start logic for loading step + retry (always clears prior errors). */
-  const runStart = async () => {
+  /** Ensure practice has a default persona without forcing the picker. */
+  const ensurePracticeProfile = () => {
     const player = data.name.trim() || "Player";
+    const profile = readPlayerProfile();
+    const persona = data.persona || profile.persona || DEFAULT_PERSONA;
+    writePlayerProfile({ persona, name: player });
+    if (!data.persona) {
+      setData((prev) => ({ ...prev, persona }));
+    }
+    return player;
+  };
+
+  const runStart = async () => {
+    const player =
+      data.mode === "solo"
+        ? ensurePracticeProfile()
+        : data.name.trim() || "Player";
+    const profile = readPlayerProfile();
     writePlayerProfile({
-      persona: data.persona || null,
+      persona: data.persona || profile.persona || DEFAULT_PERSONA,
       name: player,
     });
     try {
@@ -1030,7 +1586,6 @@ export default function OnboardingFlow() {
         return;
       }
       if (data.mode === "host") {
-        // Prefer access_code so join works even if heat_id was lost from React state
         const key =
           hostedHeat?.access_code ||
           hostedHeat?.heat_id ||
@@ -1045,7 +1600,6 @@ export default function OnboardingFlow() {
         router.push(`/play/${id}`);
         return;
       }
-      // Join by code
       const code = data.heatCode.trim();
       if (!code) {
         throw new Error("Enter a heat code first.");
@@ -1060,86 +1614,123 @@ export default function OnboardingFlow() {
     }
   };
 
-  const allScreens = [
-    { id: "welcome", component: <WelcomeScreen config={gameConfig} onNext={next} /> },
-    {
-      id: "identity",
-      component: (
-        <IdentityScreen
-          persona={data.persona}
-          name={data.name}
-          onPersonaChange={(v) => updateData("persona", v)}
-          onNameChange={(v) => updateData("name", v)}
-          onNext={next}
-          onHoverPersona={setHoverPersona}
-        />
-      ),
-    },
-    {
-      id: "mode",
-      component: (
-        <ModeScreen
-          value={data.mode}
-          onChange={(v) => updateData("mode", v)}
-          onNext={next}
-        />
-      ),
-    },
-    ...(data.mode === "heat"
-      ? [
-          {
-            id: "heatCode",
-            component: (
-              <HeatCodeScreen
-                value={data.heatCode}
-                onChange={(v) => updateData("heatCode", v)}
-                onNext={next}
-                onBack={() => setStepIndex((s) => Math.max(0, s - 1))}
-              />
-            ),
-          },
-        ]
-      : []),
-    ...(data.mode === "host"
-      ? [
-          {
-            id: "hostShare",
-            component: (
-              <HostShareScreen
-                accessCode={hostedHeat?.access_code ?? null}
-                heatId={hostedHeat?.heat_id ?? null}
-                creating={hostCreating || submitting}
-                error={hostError || error}
-                onCreate={() => void handleCreateHostedHeat()}
-                onEnter={next}
-                onBack={() => {
-                  setHostedHeat(null);
-                  setHostError(null);
-                  setStepIndex((s) => Math.max(0, s - 1));
-                }}
-              />
-            ),
-          },
-        ]
-      : []),
-    ...(data.mode === "host" || data.mode === "heat"
-      ? [
-          {
-            id: "official",
-            component: (
-              <OfficialScreen
-                isOfficial={data.isOfficial}
-                identity={data.playerIdentity}
-                onOfficialChange={(v) => updateData("isOfficial", v)}
-                onIdentityChange={(v) => updateData("playerIdentity", v)}
-                onNext={next}
-                onBack={() => setStepIndex((s) => Math.max(0, s - 1))}
-              />
-            ),
-          },
-        ]
-      : []),
-    {
+  /** Advance into tutorial (if needed) or loading — tutorial is only in the stack when needed. */
+  const goToPlayOrTutorial = () => next();
+
+  const showTutorial = tutorialGate === "needed";
+
+  const allScreens = useMemo(() => {
+    type Screen = { id: string; component: React.ReactNode };
+    const screens: Screen[] = [
+      { id: "welcome", component: <WelcomeScreen config={gameConfig} onNext={next} /> },
+      {
+        id: "mode",
+        component: (
+          <ModeScreen
+            value={data.mode}
+            onChange={(v) => updateData("mode", v)}
+            onNext={next}
+          />
+        ),
+      },
+    ];
+
+    if (data.mode === "solo") {
+      screens.push({
+        id: "practiceFast",
+        component: (
+          <PracticeFastScreen
+            persona={data.persona}
+            name={data.name}
+            onPersonaChange={(v) => updateData("persona", v)}
+            onNameChange={(v) => updateData("name", v)}
+            onStart={() => {
+              ensurePracticeProfile();
+              goToPlayOrTutorial();
+            }}
+            onBack={back}
+            onHoverPersona={setHoverPersona}
+          />
+        ),
+      });
+    } else {
+      screens.push({
+        id: "identity",
+        component: (
+          <IdentityScreen
+            persona={data.persona}
+            name={data.name}
+            onPersonaChange={(v) => updateData("persona", v)}
+            onNameChange={(v) => updateData("name", v)}
+            onNext={next}
+            onHoverPersona={setHoverPersona}
+          />
+        ),
+      });
+
+      if (data.mode === "heat") {
+        screens.push({
+          id: "heatCode",
+          component: (
+            <HeatCodeScreen
+              value={data.heatCode}
+              onChange={(v) => updateData("heatCode", v)}
+              onNext={next}
+              onBack={back}
+            />
+          ),
+        });
+      }
+
+      if (data.mode === "host") {
+        screens.push({
+          id: "hostShare",
+          component: (
+            <HostShareScreen
+              accessCode={hostedHeat?.access_code ?? null}
+              heatId={hostedHeat?.heat_id ?? null}
+              creating={hostCreating || submitting}
+              error={hostError || error}
+              onCreate={() => void handleCreateHostedHeat()}
+              onEnter={next}
+              onBack={() => {
+                setHostedHeat(null);
+                setHostError(null);
+                back();
+              }}
+            />
+          ),
+        });
+      }
+
+      screens.push({
+        id: "official",
+        component: (
+          <OfficialScreen
+            isOfficial={data.isOfficial}
+            identity={data.playerIdentity}
+            onOfficialChange={(v) => updateData("isOfficial", v)}
+            onIdentityChange={(v) => updateData("playerIdentity", v)}
+            onNext={goToPlayOrTutorial}
+            onBack={back}
+          />
+        ),
+      });
+    }
+
+    if (showTutorial) {
+      screens.push({
+        id: "tutorial",
+        component: (
+          <OnboardingWarehouseTour
+            config={gameConfig}
+            onComplete={next}
+          />
+        ),
+      });
+    }
+
+    screens.push({
       id: "loading",
       component: (
         <LoadingScreen
@@ -1155,24 +1746,54 @@ export default function OnboardingFlow() {
           onStart={() => void runStart()}
         />
       ),
-    },
-  ];
+    });
 
-  // Keep index valid when mode changes screen count (host/join/solo).
+    return screens;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuild when flow inputs change
+  }, [
+    gameConfig,
+    data.mode,
+    data.name,
+    data.persona,
+    data.heatCode,
+    data.isOfficial,
+    data.playerIdentity,
+    hostedHeat,
+    hostCreating,
+    hostError,
+    submitting,
+    error,
+    showTutorial,
+    tutorialGate,
+  ]);
+
+  // Keep index valid when mode changes screen count
   const safeIndex = Math.min(stepIndex, Math.max(0, allScreens.length - 1));
   const stepId = allScreens[safeIndex]?.id ?? "welcome";
   const progress = ((safeIndex + 1) / allScreens.length) * 100;
-  const CurrentScreen = allScreens[safeIndex].component;
+  const CurrentScreen = allScreens[safeIndex]?.component;
 
   const coachLine = useMemo(() => {
-    if (stepId === "identity") {
+    if (stepId === "identity" || stepId === "practiceFast") {
       const slug = hoverPersona || data.persona || null;
-      return personaBySlug(slug)?.coachLine ?? COACH_LINES.identity;
+      return (
+        personaBySlug(slug)?.coachLine ??
+        (stepId === "practiceFast" ? COACH_LINES.practiceFast : COACH_LINES.identity)
+      );
     }
     return COACH_LINES[stepId] ?? COACH_LINES.welcome;
   }, [stepId, hoverPersona, data.persona]);
 
-  const showCoach = stepId !== "loading";
+  // Warehouse tour has its own coach + dark overlay — hide side mascot.
+  const showCoach = stepId !== "loading" && stepId !== "tutorial";
+
+  // Screens that already have their own Back control
+  const hasInlineBack =
+    stepId === "heatCode" ||
+    stepId === "hostShare" ||
+    stepId === "official" ||
+    stepId === "practiceFast" ||
+    stepId === "tutorial";
 
   return (
     <GridBackground>
@@ -1205,8 +1826,12 @@ export default function OnboardingFlow() {
               : "w-full"
           }
         >
-          {/* Interactive column — centered, stable height (no coach dialogue here) */}
-          <section className="flex min-w-0 flex-col gap-5 w-full max-w-[480px] mx-auto">
+          <section
+            className={[
+              "flex min-w-0 flex-col gap-5 w-full mx-auto",
+              stepId === "tutorial" ? "max-w-[720px]" : "max-w-[480px]",
+            ].join(" ")}
+          >
             <PageTransition key={stepId}>{CurrentScreen}</PageTransition>
 
             {safeIndex === 0 && (
@@ -1225,31 +1850,26 @@ export default function OnboardingFlow() {
               </a>
             )}
 
-            {safeIndex > 0 &&
-              safeIndex < allScreens.length - 1 &&
-              stepId !== "heatCode" &&
-              stepId !== "hostShare" &&
-              stepId !== "official" && (
-                <button
-                  type="button"
-                  onClick={() => setStepIndex((s) => Math.max(0, s - 1))}
-                  style={{
-                    fontFamily: FO,
-                    fontSize: 13,
-                    color: "var(--sv-text-muted)",
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    textDecoration: "underline",
-                    alignSelf: "center",
-                  }}
-                >
-                  Back
-                </button>
-              )}
+            {safeIndex > 0 && safeIndex < allScreens.length - 1 && !hasInlineBack && (
+              <button
+                type="button"
+                onClick={back}
+                style={{
+                  fontFamily: FO,
+                  fontSize: 13,
+                  color: "var(--sv-text-muted)",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  alignSelf: "center",
+                }}
+              >
+                Back
+              </button>
+            )}
           </section>
 
-          {/* Coach + bubble — stacked on phone, right unit on desktop */}
           {showCoach && (
             <div className="flex w-full max-w-full justify-center self-center order-first px-1 sm:px-0 sm:max-w-none lg:order-none lg:w-auto lg:justify-end">
               <CoachSpeech line={coachLine} messageKey={stepId} size="lg" />

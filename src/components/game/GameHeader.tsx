@@ -1,8 +1,8 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import Image from "next/image";
-import { Info } from "@/components/cyan/PixelIcons";
+import { Info, Trophy } from "@/components/cyan/PixelIcons";
 import { GameButton } from "@/components/cyan";
 import {
   PERSONA_AVATAR_PLACEHOLDER,
@@ -35,7 +35,6 @@ export function GameHeader({
   onHowToPlayClick?: () => void;
 }) {
   const avatarSrc = usePlayerAvatarSrc();
-  const costStr = attempt.cumulative_cost.toLocaleString();
   const config = attempt.configuration;
   const unit = config.timeline_unit || "Round";
   const totalRounds = config.total_rounds;
@@ -130,11 +129,12 @@ export function GameHeader({
                   className="hidden sm:flex"
                 />
               )}
-              <MetricPill label="Cost" value={`$${costStr}`} accent />
               {livePosition != null && (
                 <MetricPill
-                  label="Pos"
+                  label="Position"
                   value={`#${livePosition}`}
+                  icon={<Trophy size={12} color="var(--sv-teal-mid)" />}
+                  accent
                   className="hidden sm:flex"
                 />
               )}
@@ -161,16 +161,18 @@ function MetricPill({
   label,
   value,
   accent,
+  icon,
   className = "",
 }: {
   label: string;
   value: string;
   accent?: boolean;
+  icon?: ReactNode;
   className?: string;
 }) {
   return (
     <div
-      className={`flex flex-col gap-0.5 items-end justify-center rounded-xl px-1.5 sm:px-2.5 py-1 sm:py-1.5 min-w-[52px] sm:min-w-[76px] ${className}`}
+      className={`sv-surface flex flex-col gap-0.5 items-end justify-center rounded-xl px-1.5 sm:px-2.5 py-1 sm:py-1.5 min-w-[52px] sm:min-w-[76px] ${className}`}
       style={{
         background: "rgba(255,255,255,0.55)",
         border: "1px solid color-mix(in srgb, var(--sv-border) 70%, white)",
@@ -180,11 +182,14 @@ function MetricPill({
         {label}
       </span>
       <span
-        className={`text-[11px] sm:text-[13px] font-bold leading-tight sv-tabular ${
+        className={`inline-flex items-center gap-1 text-[11px] sm:text-[13px] font-bold leading-tight sv-tabular ${
           accent ? "text-sv-teal-mid" : "text-sv-ink"
         }`}
       >
-        {value}
+        {icon}
+        <span key={value} className="sv-value-tick">
+          {value}
+        </span>
       </span>
     </div>
   );
