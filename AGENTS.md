@@ -19,7 +19,7 @@
 | State | Zustand `src/store/useAttemptStore.ts` |
 | Engine | Pure TS `src/engine/*` (unit-tested; shared contract with backend) |
 | API | `src/services/api.ts` live · `mockAdapter.ts` default offline |
-| Charts | Recharts via `GraphicalView` (beer-game evolution style) |
+| Charts | shadcn `ui/chart` (ChartContainer/Tooltip) over Recharts, wrapped by `GraphicalView` |
 | Motion | `motion/react` |
 | Tests | Vitest (`npm test`) |
 
@@ -34,6 +34,7 @@ src/
     cyan/              # design system + PixelIcons
     game/              # play UI (KPIs, pipeline, charts, decision)
     report/            # final performance report
+    ui/                # shadcn registry components (do not hand-edit)
   engine/              # PRD formulas (source of truth for math)
   server/              # backend domain: store, service, leaderboard, errors
   services/            # client API + mock
@@ -67,6 +68,10 @@ public/
 ## Design non-negotiables
 
 - **Tokens only:** `var(--sv-*)` — no raw hex in new UI chrome  
+- **shadcn registry:** `components.json` + `src/components/ui/*` (chart only today). Its semantic
+  vars (`--background`, `--muted-foreground`, `--chart-*`, …) are **mapped to `--sv-*`** in
+  `globals.css` — light-only, no `.dark` block, and shadcn's `@layer base` body reset is
+  deliberately omitted. Re-running `shadcn init` re-adds all three; strip them again.  
 - **Icons:** PixelIcons only — no lucide-react, no emoji  
 - **Font:** Outfit (`next/font`) via `--sv-font-ui`  
 - **No pure black** `#000` — use `var(--sv-ink)`  

@@ -104,6 +104,64 @@ nextjs-portal:empty {
   --sv-ease-travel: cubic-bezier(0.65, 0, 0.35, 1);
   --sv-press-ms: 140ms;
   --sv-ui-ms: 200ms;
+
+  /* ---------------------------------------------------------------------
+     shadcn/ui semantic tokens, mapped onto the Cyan --sv-* palette so
+     registry components (chart, card) inherit the product theme instead of
+     shadcn's neutral grays. Change --sv-* and these follow — never hardcode.
+     Light-only by design: no `.dark` block (see AGENTS.md design rules).
+     --------------------------------------------------------------------- */
+  --background: var(--sv-card-solid);
+  --foreground: var(--sv-ink);
+  --card: var(--sv-card);
+  --card-foreground: var(--sv-ink);
+  --popover: var(--sv-card-solid);
+  --popover-foreground: var(--sv-ink);
+  --primary: var(--sv-teal-mid);
+  --primary-foreground: var(--sv-card-solid);
+  --secondary: var(--sv-muted);
+  --secondary-foreground: var(--sv-ink);
+  --muted: var(--sv-muted);
+  --muted-foreground: var(--sv-text-muted);
+  --accent: var(--sv-cyan-tint);
+  --accent-foreground: var(--sv-ink);
+  --destructive: var(--sv-destructive);
+  --border: var(--sv-border);
+  --input: var(--sv-border);
+  --ring: var(--sv-cyan);
+  --chart-1: var(--sv-chart-1);
+  --chart-2: var(--sv-chart-2);
+  --chart-3: var(--sv-chart-3);
+  --chart-4: var(--sv-chart-4);
+  --chart-5: var(--sv-chart-5);
+  --radius: var(--sv-radius-lg);
+}
+
+/* shadcn semantic utilities (bg-card, text-muted-foreground, border-border …) */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
 }
 
 @theme {
