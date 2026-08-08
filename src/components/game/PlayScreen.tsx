@@ -23,12 +23,19 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
   /**
    * Focused-element coach tour (dark overlay + spotlight).
    * Auto-starts once; How to Play reopens it anytime.
+   * Default false for SSR hydrate parity; promote after mount if needed.
    */
-  const [tourActive, setTourActive] = useState(() =>
-    typeof window !== "undefined" ? !hasCompletedPlayTour() : false,
-  );
+  const [tourActive, setTourActive] = useState(false);
   /** True when user reopened via How to play (not first-run auto). */
   const [tourReplay, setTourReplay] = useState(false);
+
+  useEffect(() => {
+    // Defer past hydrate so SSR markup matches first paint.
+    const id = window.requestAnimationFrame(() => {
+      if (!hasCompletedPlayTour()) setTourActive(true);
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, []);
   const {
     attempt,
     opening,
@@ -143,14 +150,18 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
         */}
         <main
           className={[
-            "max-w-[1288px] mx-auto px-3 sm:px-4 md:px-6 flex flex-col gap-3 sm:gap-4",
-            "min-h-dvh",
-            "lg:h-dvh lg:max-h-dvh lg:overflow-hidden",
-            "overflow-x-clip overflow-y-auto lg:overflow-y-hidden",
-            "pt-3 sm:pt-4",
+            "max-w-[1288px] mx-auto px-3 sm:px-4 md:px-6 flex flex-col gap-2 sm:gap-3 md:gap-4",
+            // Round summary: lock to viewport so the section scrolls inside (CTA stays reachable).
+            // Decide mode: mobile scrolls the page; lg+ densified single screen.
             isRoundFlow
-              ? "pb-[max(1rem,env(safe-area-inset-bottom))]"
-              : "pb-[calc(7.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-[92px]",
+              ? "h-dvh max-h-dvh overflow-hidden pt-2 sm:pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+              : [
+                  "min-h-dvh",
+                  "lg:h-dvh lg:max-h-dvh lg:overflow-hidden",
+                  "overflow-x-clip overflow-y-auto lg:overflow-y-hidden",
+                  "pt-3 sm:pt-4",
+                  "pb-[calc(7.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-[92px]",
+                ].join(" "),
           ].join(" ")}
           style={{ color: "var(--sv-text)" }}
         >
@@ -176,7 +187,7 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
           )}
 
           {isRoundFlow && lastRecord ? (
-            <div className="sv-phase-in flex-1 min-h-0 lg:overflow-y-auto overflow-x-hidden">
+            <div className="sv-phase-in flex-1 min-h-0 flex flex-col overflow-hidden">
               <SupplyChainAnimation
                 record={lastRecord}
                 attempt={attempt}

@@ -1,7 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { COACH_AVATAR_SRC } from "@/lib/personas";
+import {
+  coachExpressionForTone,
+  coachSrc,
+  type CoachExpression,
+} from "@/lib/personas";
 import { CoachDialogue } from "./CoachDialogue";
 
 export type CoachTone = "ok" | "warn" | "danger" | "tip";
@@ -18,6 +22,11 @@ type CoachSpeechProps = {
   /** Remounts typewriter when message identity changes. */
   messageKey: string;
   tone?: CoachTone;
+  /**
+   * Explicit pose override. When omitted, derived from `tone`:
+   * ok→celebrate · warn→thinking · danger→alert · tip→explain
+   */
+  expression?: CoachExpression;
   /** `md` = compact play overlay; `lg` = onboarding hero. */
   size?: "md" | "lg";
   className?: string;
@@ -29,22 +38,27 @@ type CoachSpeechProps = {
  * Bubble sits at the coach's head (top-aligned), tail points into the face.
  * Overlay (md): horizontal — bubble left, coach right.
  * Onboarding (lg): stacked on xs, side-by-side from `sm`.
+ * Pose swaps with tone (or `expression`) so the mascot matches the message.
  */
 export function CoachSpeech({
   line,
   messageKey,
   tone = "tip",
+  expression,
   size = "lg",
   className = "",
   onDialogueComplete,
 }: CoachSpeechProps) {
   const borderColor = TONE_BORDER[tone];
   const isOverlay = size === "md";
+  const pose = expression ?? coachExpressionForTone(tone);
+  const avatarSrc = coachSrc(pose);
 
-  // Mascot as accent — bubble is primary. Keep under ~120px on play overlay.
+  // Mascot as accent — bubble is primary. Sizes at 1.2× prior scale for pose readability.
+  // Full-body poses (alert/celebrate) need a bit more height so hands aren't clipped.
   const bustClass = isOverlay
-    ? "h-[100px] w-auto object-contain object-bottom [image-rendering:pixelated] sm:h-[84px] lg:h-[96px]"
-    : "h-[160px] w-auto object-contain object-bottom [image-rendering:pixelated] sm:h-[120px] lg:h-[140px]";
+    ? "h-[130px] w-auto object-contain object-bottom [image-rendering:pixelated] sm:h-[110px] lg:h-[125px]"
+    : "h-[202px] w-auto object-contain object-bottom [image-rendering:pixelated] sm:h-[154px] lg:h-[178px]";
 
   const bubbleMax = isOverlay
     ? "max-w-none flex-1 min-w-0"
@@ -149,22 +163,23 @@ export function CoachSpeech({
       </div>
 
       <div
-        className={`pointer-events-none shrink-0 ${
+        className={`pointer-events-none shrink-0 transition-[opacity,transform] duration-200 ease-out ${
           isOverlay ? "-ml-0.5" : "sm:-ml-0.5"
         }`}
         aria-hidden
       >
         <Image
-          src={COACH_AVATAR_SRC}
+          key={pose}
+          src={avatarSrc}
           alt=""
-          width={1122}
-          height={1402}
+          width={1134}
+          height={1403}
           priority={size === "lg"}
           unoptimized
           sizes={
             isOverlay
-              ? "(max-width: 640px) 100px, 96px"
-              : "(max-width: 640px) 160px, (max-width: 1024px) 120px, 140px"
+              ? "(max-width: 640px) 130px, 125px"
+              : "(max-width: 640px) 202px, (max-width: 1024px) 154px, 178px"
           }
           className={bustClass}
         />

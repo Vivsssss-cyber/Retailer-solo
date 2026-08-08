@@ -119,6 +119,12 @@ function syncOpening(attempt: Attempt): OpeningRoundView | null {
 
 /** Coalesce concurrent startSolo (Strict Mode double-effect, double-click). */
 let startSoloInflight: Promise<string> | null = null;
+/** Coalesce concurrent host heat create (Strict Mode / double click). */
+let createHostedHeatInflight: Promise<{ heat_id: string; access_code: string }> | null =
+  null;
+/** Coalesce concurrent joinHeat (Strict Mode remount / double submit). */
+let joinHeatInflight: Promise<string> | null = null;
+let joinHeatInflightKey: string | null = null;
 
 export const useAttemptStore = create<AttemptState>((set, get) => ({
   ...initial,
@@ -161,26 +167,34 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
   },
 
   async createHostedHeat(playerName?: string) {
-    set({ error: null, submitting: true });
-    try {
-      const heat = await api.createHeat({
-        solo: false,
-        player_name: playerName,
-      });
-      persistHeatCode(heat.access_code);
-      set({
-        heatAccessCode: heat.access_code,
-        submitting: false,
-      });
-      return { heat_id: heat.heat_id, access_code: heat.access_code };
-    } catch (e) {
-      const { message } = parseApiFailure(e);
-      set({
-        error: message,
-        submitting: false,
-      });
-      throw e;
-    }
+    if (createHostedHeatInflight) return createHostedHeatInflight;
+
+    createHostedHeatInflight = (async () => {
+      set({ error: null, submitting: true });
+      try {
+        const heat = await api.createHeat({
+          solo: false,
+          player_name: playerName,
+        });
+        persistHeatCode(heat.access_code);
+        set({
+          heatAccessCode: heat.access_code,
+          submitting: false,
+        });
+        return { heat_id: heat.heat_id, access_code: heat.access_code };
+      } catch (e) {
+        const { message } = parseApiFailure(e);
+        set({
+          error: message,
+          submitting: false,
+        });
+        throw e;
+      } finally {
+        createHostedHeatInflight = null;
+      }
+    })();
+
+    return createHostedHeatInflight;
   },
 
   async joinHeat(
@@ -188,51 +202,64 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
     playerName: string,
     options?: JoinOptions,
   ) {
-    set({ error: null, submitting: true });
-    try {
-      const key = normalizeHeatKey(heatIdOrCode);
-      if (!key) {
-        const err = new Error("Enter a heat code first.");
-        set({ error: err.message, submitting: false });
-        throw err;
-      }
-      // If joining by short code (not heat_ id), remember it for the header.
-      if (!isHeatId(key)) {
-        persistHeatCode(key);
-        set({ heatAccessCode: key });
-      }
-      const isOfficial = options?.is_official === true;
-      const identity = options?.player_identity?.trim() || undefined;
-      if (isOfficial && !identity) {
-        const err = new Error(
-          "Official attempts need an email or ID so we can lock one attempt per person.",
-        );
-        set({ error: err.message, submitting: false });
-        throw err;
-      }
-      const attempt = withMigratedConfig(
-        await api.createAttempt(key, {
-          player_name: playerName,
-          is_official: isOfficial || undefined,
-          player_identity: isOfficial ? identity : undefined,
-        }),
-      );
-      const opening = syncOpening(attempt);
-      set({
-        attempt,
-        opening,
-        phase: "decide",
-        orderInput: 0,
-        heatAccessCode: get().heatAccessCode ?? readPersistedHeatCode(),
-        submitting: false,
-      });
-      await get().refreshLeaderboards();
-      return attempt.attempt_id;
-    } catch (e) {
-      const { message } = parseApiFailure(e);
-      set({ error: message, submitting: false });
-      throw e;
+    const key = normalizeHeatKey(heatIdOrCode);
+    const inflightKey = `${key}|${playerName}|${options?.is_official === true}|${options?.player_identity?.trim() || ""}`;
+    if (joinHeatInflight && joinHeatInflightKey === inflightKey) {
+      return joinHeatInflight;
     }
+
+    joinHeatInflightKey = inflightKey;
+    joinHeatInflight = (async () => {
+      set({ error: null, submitting: true });
+      try {
+        if (!key) {
+          const err = new Error("Enter a heat code first.");
+          set({ error: err.message, submitting: false });
+          throw err;
+        }
+        // If joining by short code (not heat_ id), remember it for the header.
+        if (!isHeatId(key)) {
+          persistHeatCode(key);
+          set({ heatAccessCode: key });
+        }
+        const isOfficial = options?.is_official === true;
+        const identity = options?.player_identity?.trim() || undefined;
+        if (isOfficial && !identity) {
+          const err = new Error(
+            "Official attempts need an email or ID so we can lock one attempt per person.",
+          );
+          set({ error: err.message, submitting: false });
+          throw err;
+        }
+        const attempt = withMigratedConfig(
+          await api.createAttempt(key, {
+            player_name: playerName,
+            is_official: isOfficial || undefined,
+            player_identity: isOfficial ? identity : undefined,
+          }),
+        );
+        const opening = syncOpening(attempt);
+        set({
+          attempt,
+          opening,
+          phase: "decide",
+          orderInput: 0,
+          heatAccessCode: get().heatAccessCode ?? readPersistedHeatCode(),
+          submitting: false,
+        });
+        await get().refreshLeaderboards();
+        return attempt.attempt_id;
+      } catch (e) {
+        const { message } = parseApiFailure(e);
+        set({ error: message, submitting: false });
+        throw e;
+      } finally {
+        joinHeatInflight = null;
+        joinHeatInflightKey = null;
+      }
+    })();
+
+    return joinHeatInflight;
   },
 
   async hydrate(attemptId: string) {

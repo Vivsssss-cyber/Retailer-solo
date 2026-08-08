@@ -76,7 +76,7 @@ export function lockAdmin() {
  */
 export function normalizeGameConfig(input: GameConfig): GameConfig {
   const cfg = migrateGameConfig(input);
-  const total = Math.min(15, Math.max(1, Math.floor(cfg.total_rounds) || 12));
+  const total = Math.min(50, Math.max(1, Math.floor(cfg.total_rounds) || 12));
   const delay = Math.min(5, Math.max(1, Math.floor(cfg.delivery_delay) || 2));
 
   const demand = padNumArray(

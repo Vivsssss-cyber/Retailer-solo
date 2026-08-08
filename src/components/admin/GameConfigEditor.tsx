@@ -235,7 +235,7 @@ export function GameNumbersSection({
   update: (p: Partial<GameConfig>) => void;
 }) {
   const setRounds = (n: number) => {
-    const total = Math.min(15, Math.max(1, n));
+    const total = Math.min(50, Math.max(1, n));
     const demand = [...config.customer_demand_by_round];
     const supply = [...config.supply_rate_by_round];
     while (demand.length < total) demand.push(demand[demand.length - 1] ?? 4);
@@ -263,11 +263,11 @@ export function GameNumbersSection({
       subtitle="Rounds, delay, stock, costs — core beer-game stats control."
     >
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Field label="Total rounds" hint="Max 15">
+        <Field label="Total rounds" hint="Max 50">
           <input
             type="number"
             min={1}
-            max={15}
+            max={50}
             style={adminInputStyle}
             value={config.total_rounds}
             onChange={(e) => setRounds(parseInt(e.target.value, 10) || 1)}

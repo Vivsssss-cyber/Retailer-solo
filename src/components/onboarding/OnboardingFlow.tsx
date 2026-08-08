@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -25,6 +25,7 @@ import {
   PERSONA_AVATAR_PLACEHOLDER,
   PERSONAS,
   personaBySlug,
+  type CoachExpression,
   type PersonaSlug,
 } from "@/lib/personas";
 import { readPlayerProfile, writePlayerProfile } from "@/lib/playerProfile";
@@ -51,6 +52,20 @@ const COACH_LINES: Record<string, string> = {
     "Last chance. Official cannot be undone for this email on this heat.",
   tutorial: "I'll spotlight the warehouse — inventory, history, charts, and your order dock.",
   loading: "Locking in your setup. Warehouse opens in a second…",
+};
+
+/** Pose per onboarding beat — matches message intent, not just tip/warn tones. */
+const COACH_EXPRESSIONS_BY_STEP: Record<string, CoachExpression> = {
+  welcome: "neutral",
+  mode: "explain",
+  practiceFast: "explain",
+  identity: "explain",
+  heatCode: "thinking",
+  hostShare: "explain",
+  official: "thinking",
+  officialConfirm: "alert",
+  tutorial: "explain",
+  loading: "thinking",
 };
 
 type PlayMode = "solo" | "host" | "heat";
@@ -183,11 +198,25 @@ function BackButton({ onClick }: { onClick: () => void }) {
 // ---------------------------------------------------------
 
 function WelcomeScreen({ onNext, config }: { onNext: () => void; config: GameConfig }) {
-  const unit = (config.timeline_unit || "Round").toLowerCase().slice(0, 3);
+  // Full unit label with plural (avoid "2 rou" from slice(0,3) on "Round")
+  const unitBase = (config.timeline_unit || "Round").toLowerCase();
+  const unitLabel =
+    config.delivery_delay === 1
+      ? unitBase
+      : unitBase.endsWith("s")
+        ? unitBase
+        : `${unitBase}s`;
   return (
     <GlassCard className="text-center relative overflow-hidden p-4">
       <div className="flex justify-center mb-6">
-        <Image src="/cyan-logo.svg" alt="CYAN" width={64} height={64} unoptimized />
+        <Image
+          src="/cyan-logo.svg"
+          alt="CYAN"
+          width={64}
+          height={64}
+          unoptimized
+          style={{ width: "auto", height: "auto", maxWidth: 64, maxHeight: 64 }}
+        />
       </div>
       <h1
         className="text-[clamp(1.35rem,5.2vw,2rem)] sm:text-[32px]"
@@ -224,7 +253,7 @@ function WelcomeScreen({ onNext, config }: { onNext: () => void; config: GameCon
         <Fact
           icon={<Truck size={16} color="var(--sv-teal-mid)" />}
           label="Delay"
-          value={`${config.delivery_delay} ${unit}`}
+          value={`${config.delivery_delay} ${unitLabel}`}
         />
         <Fact
           icon={<DollarSign size={16} color="var(--sv-teal-mid)" />}
@@ -924,16 +953,23 @@ function HostShareScreen({
 }) {
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [origin] = useState(() =>
-    typeof window !== "undefined" ? window.location.origin : "",
-  );
+  const [origin, setOrigin] = useState("");
+  /** Guard Strict Mode double-mount so we only POST one heat. */
+  const createOnceRef = useRef(false);
 
   useEffect(() => {
-    if (!accessCode && !creating) {
-      onCreate();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- create once on mount
+    const id = window.requestAnimationFrame(() => {
+      setOrigin(window.location.origin);
+    });
+    return () => window.cancelAnimationFrame(id);
   }, []);
+
+  useEffect(() => {
+    if (accessCode || creating || createOnceRef.current) return;
+    createOnceRef.current = true;
+    onCreate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- create once on mount
+  }, [accessCode, creating]);
 
   const joinUrl =
     accessCode && origin
@@ -1461,10 +1497,18 @@ export default function OnboardingFlow() {
   /**
    * Focused-element warehouse tour (dark overlay + spotlights).
    * Same PlayTour as in-game How to play — runs once during onboarding.
+   * Default "skip" on SSR so progress bar width matches client hydrate;
+   * promote to "needed" after mount when tour not yet completed.
    */
-  const [tutorialGate] = useState<"needed" | "skip">(() =>
-    typeof window !== "undefined" && !hasCompletedPlayTour() ? "needed" : "skip",
-  );
+  const [tutorialGate, setTutorialGate] = useState<"needed" | "skip">("skip");
+
+  useEffect(() => {
+    // Defer past hydrate so progress-bar width matches SSR first paint.
+    const id = window.requestAnimationFrame(() => {
+      if (!hasCompletedPlayTour()) setTutorialGate("needed");
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1488,33 +1532,36 @@ export default function OnboardingFlow() {
     };
   }, []);
 
-  const [data, setData] = useState(() => {
-    if (typeof window === "undefined") {
-      return {
-        persona: "" as PersonaSlug | "",
-        name: "",
-        mode: "solo" as PlayMode,
-        heatCode: "",
-        isOfficial: false,
-        playerIdentity: "",
-      };
-    }
-    const profile = readPlayerProfile();
-    const code = readQueryHeatCode();
-    return {
-      persona: (profile.persona ?? "") as PersonaSlug | "",
-      name: profile.name ?? "",
-      mode: (code ? "heat" : "solo") as PlayMode,
-      heatCode: code,
-      isOfficial: false,
-      playerIdentity: readSavedIdentity(),
-    };
+  // Empty defaults for SSR/hydrate parity; hydrate from storage + ?code= after mount.
+  const [data, setData] = useState({
+    persona: "" as PersonaSlug | "",
+    name: "",
+    mode: "solo" as PlayMode,
+    heatCode: "",
+    isOfficial: false,
+    playerIdentity: "",
   });
 
   // welcome(0) → mode(1) → identity(2) when joining via QR/link
-  const [stepIndex, setStepIndex] = useState(() =>
-    typeof window !== "undefined" && readQueryHeatCode() ? 2 : 0,
-  );
+  // Always start at 0 for SSR hydrate parity; jump after mount if ?code= present.
+  const [stepIndex, setStepIndex] = useState(0);
+
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => {
+      const profile = readPlayerProfile();
+      const code = readQueryHeatCode();
+      setData((prev) => ({
+        ...prev,
+        persona: (profile.persona ?? prev.persona) as PersonaSlug | "",
+        name: profile.name ?? prev.name,
+        mode: code ? "heat" : prev.mode,
+        heatCode: code || prev.heatCode,
+        playerIdentity: readSavedIdentity() || prev.playerIdentity,
+      }));
+      if (code) setStepIndex(2);
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, []);
 
   const updateData = <K extends keyof typeof data>(key: K, val: (typeof data)[K]) => {
     setData((prev) => {
@@ -1784,6 +1831,15 @@ export default function OnboardingFlow() {
     return COACH_LINES[stepId] ?? COACH_LINES.welcome;
   }, [stepId, hoverPersona, data.persona]);
 
+  const coachExpression = useMemo((): CoachExpression => {
+    // Persona pick feedback — coach reacts to the choice.
+    if (stepId === "identity" || stepId === "practiceFast") {
+      if (hoverPersona || data.persona) return "celebrate";
+      return "explain";
+    }
+    return COACH_EXPRESSIONS_BY_STEP[stepId] ?? "neutral";
+  }, [stepId, hoverPersona, data.persona]);
+
   // Warehouse tour has its own coach + dark overlay — hide side mascot.
   const showCoach = stepId !== "loading" && stepId !== "tutorial";
 
@@ -1872,7 +1928,19 @@ export default function OnboardingFlow() {
 
           {showCoach && (
             <div className="flex w-full max-w-full justify-center self-center order-first px-1 sm:px-0 sm:max-w-none lg:order-none lg:w-auto lg:justify-end">
-              <CoachSpeech line={coachLine} messageKey={stepId} size="lg" />
+              <CoachSpeech
+                line={coachLine}
+                messageKey={`${stepId}-${coachExpression}`}
+                expression={coachExpression}
+                tone={
+                  coachExpression === "alert"
+                    ? "danger"
+                    : coachExpression === "celebrate"
+                      ? "ok"
+                      : "tip"
+                }
+                size="lg"
+              />
             </div>
           )}
         </div>
