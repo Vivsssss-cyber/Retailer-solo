@@ -1,4 +1,5 @@
 import { jsonError, jsonOk, parseJson } from "@/server/http";
+import { assertRateLimit, clientIpFromRequest } from "@/server/rateLimit";
 import { createAttempt, type CreateAttemptBody } from "@/server/service";
 
 export const dynamic = "force-dynamic";
@@ -8,13 +9,18 @@ export async function POST(
   context: { params: Promise<{ accessCode: string }> },
 ) {
   try {
+    assertRateLimit({
+      key: `create-attempt:${clientIpFromRequest(request)}`,
+      limit: 30,
+      windowMs: 60_000,
+    });
     const { accessCode } = await context.params;
     const body = await parseJson<CreateAttemptBody>(request);
-    const attempt = await createAttempt(
+    const result = await createAttempt(
       decodeURIComponent(accessCode),
       body ?? { player_name: "Player" },
     );
-    return jsonOk(attempt, { status: 201 });
+    return jsonOk(result, { status: 201 });
   } catch (err) {
     return jsonError(err);
   }

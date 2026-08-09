@@ -20,10 +20,19 @@ export interface CreateHeatResponse {
 
 export interface CreateAttemptRequest {
   player_name: string;
-  /** Stable identity for one-official-attempt lock (email / device id). */
+  /**
+   * Optional soft identity for one-official-attempt lock (local name key).
+   * Classroom room access is heat access_code + QR — not email OTP.
+   */
   player_identity?: string;
-  /** When true, server rejects a second attempt with the same identity. */
+  /** When true and identity set, server rejects a second attempt with same identity. */
   is_official?: boolean;
+}
+
+export interface CreateAttemptResponse {
+  attempt: import("@/engine/types").Attempt;
+  /** Ownership secret — store client-side; send as X-Player-Token. */
+  player_token: string;
 }
 
 export interface SubmitRoundRequest {
@@ -50,15 +59,21 @@ export interface CompleteAttemptResponse {
 
 export interface RetailerChallengeApi {
   getConfiguration(configurationId?: string): Promise<GameConfig>;
-  /** Admin write — live API requires X-Admin-Pin; mock writes localStorage. */
+  /** Admin write — live API requires admin cookie session; mock writes localStorage. */
   putConfiguration(config: GameConfig): Promise<GameConfig>;
   createHeat(body: CreateHeatRequest): Promise<CreateHeatResponse>;
-  createAttempt(heatId: string, body: CreateAttemptRequest): Promise<Attempt>;
+  createAttempt(
+    heatId: string,
+    body: CreateAttemptRequest,
+  ): Promise<CreateAttemptResponse>;
   getAttempt(attemptId: string): Promise<Attempt | null>;
   submitRound(attemptId: string, body: SubmitRoundRequest): Promise<SubmitRoundResponse>;
   completeAttempt(attemptId: string): Promise<CompleteAttemptResponse>;
   getHeatLeaderboard(heatId: string, mode: "live" | "final"): Promise<LeaderboardRow[]>;
   getGlobalLeaderboard(configurationId: string): Promise<LeaderboardRow[]>;
+  /** Live: server verifies PIN, sets httpOnly cookie. Mock: no-op. */
+  adminLogin(pin: string): Promise<{ ok: true }>;
+  adminLogout(): Promise<{ ok: true }>;
   getAdminData(): Promise<{
     heats: Array<{
       heat_id: string;

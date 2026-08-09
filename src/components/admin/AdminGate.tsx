@@ -2,7 +2,14 @@
 
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { FO, GameButton, GridBackground, PageTransition, cardStyle } from "@/components/cyan";
-import { ADMIN_PIN, isAdminUnlocked, unlockAdmin } from "@/lib/adminConfigStore";
+import {
+  isAdminUnlocked,
+  lockAdmin,
+  markAdminUnlocked,
+  unlockAdminMock,
+} from "@/lib/adminConfigStore";
+import { api, USE_MOCK } from "@/services/api";
+import { parseApiFailure } from "@/services/apiErrors";
 
 /** sessionStorage has no change events in-tab; PIN unlock updates local state. */
 const subscribeNoop = () => () => {};
@@ -17,6 +24,30 @@ export function AdminGate({ children }: { children: ReactNode }) {
   const unlocked = sessionUnlocked || localUnlocked;
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function tryUnlock() {
+    setError(null);
+    setBusy(true);
+    try {
+      if (USE_MOCK) {
+        if (!unlockAdminMock(pin)) {
+          setError("Enter the admin PIN");
+          return;
+        }
+        setLocalUnlocked(true);
+        return;
+      }
+      await api.adminLogin(pin);
+      markAdminUnlocked();
+      setLocalUnlocked(true);
+    } catch (e) {
+      const { message } = parseApiFailure(e);
+      setError(message || "Incorrect PIN");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (!unlocked) {
     return (
@@ -44,19 +75,19 @@ export function AdminGate({ children }: { children: ReactNode }) {
                 }}
               >
                 Enter the admin PIN to manage game numbers, demand sequences, and session data.
-                (Local mock only — default PIN: <code style={{ fontWeight: 700 }}>{ADMIN_PIN}</code>)
+                {USE_MOCK
+                  ? " Mock mode: any non-empty PIN unlocks this browser only."
+                  : " Live mode: PIN is verified on the server (never shown here)."}
               </p>
               <input
                 type="password"
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    if (unlockAdmin(pin)) setLocalUnlocked(true);
-                    else setError("Incorrect PIN");
-                  }
+                  if (e.key === "Enter" && !busy) void tryUnlock();
                 }}
-                placeholder="PIN"
+                placeholder="Admin PIN"
+                autoComplete="current-password"
                 style={{
                   fontFamily: FO,
                   width: "100%",
@@ -76,12 +107,10 @@ export function AdminGate({ children }: { children: ReactNode }) {
               <GameButton
                 type="button"
                 style={{ width: "100%" }}
-                onClick={() => {
-                  if (unlockAdmin(pin)) setLocalUnlocked(true);
-                  else setError("Incorrect PIN");
-                }}
+                disabled={busy}
+                onClick={() => void tryUnlock()}
               >
-                Unlock admin
+                {busy ? "Checking…" : "Unlock admin"}
               </GameButton>
             </div>
           </main>
@@ -90,5 +119,19 @@ export function AdminGate({ children }: { children: ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {/* Hidden helper for lock paths that import lockAdmin + optional logout */}
+      <span
+        data-admin-unlocked="1"
+        style={{ display: "none" }}
+        aria-hidden
+        onClick={() => {
+          lockAdmin();
+          if (!USE_MOCK) void api.adminLogout();
+        }}
+      />
+    </>
+  );
 }

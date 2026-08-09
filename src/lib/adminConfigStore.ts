@@ -8,9 +8,6 @@ import { DEFAULT_CONFIG, migrateGameConfig, type GameConfig } from "@/engine";
 export const ADMIN_CONFIG_KEY = "retailer-challenge-admin-config-v1";
 export const ADMIN_SESSION_KEY = "retailer-challenge-admin-session";
 
-/** Lightweight gate for local/mock admin — not production auth. */
-export const ADMIN_PIN = "admin";
-
 export function cloneDefaultConfig(): GameConfig {
   return structuredClone(DEFAULT_CONFIG);
 }
@@ -57,11 +54,20 @@ export function isAdminUnlocked(): boolean {
   return sessionStorage.getItem(ADMIN_SESSION_KEY) === "1";
 }
 
-export function unlockAdmin(pin: string): boolean {
-  if (pin.trim() !== ADMIN_PIN) return false;
+/** Mark UI unlocked after successful mock unlock or live admin login. */
+export function markAdminUnlocked(): void {
   if (typeof window !== "undefined") {
     sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
   }
+}
+
+/**
+ * Mock-only local unlock (no secret in the client bundle).
+ * Live mode must call api.adminLogin(pin) then markAdminUnlocked().
+ */
+export function unlockAdminMock(pin: string): boolean {
+  if (!pin.trim()) return false;
+  markAdminUnlocked();
   return true;
 }
 

@@ -128,6 +128,7 @@ export default function AdminDataPage() {
             variant="outline"
             onClick={() => {
               lockAdmin();
+              if (!USE_MOCK) void api.adminLogout();
               window.location.href = "/admin";
             }}
           >

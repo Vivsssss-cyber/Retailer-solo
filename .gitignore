@@ -77,6 +77,8 @@ temp/
 test-results/
 playwright-report/
 blob-report/
+tmp-*.png
+tmp-*.jpg
 
 # Local agent / project notes (keep untracked)
 docs/
@@ -84,3 +86,4 @@ CLAUDE.md
 Claude.md
 claude.md
 .context/
+.gstack/

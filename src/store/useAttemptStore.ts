@@ -138,11 +138,10 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
         const heat = await api.createHeat({ solo: true, player_name: playerName });
         persistHeatCode(heat.access_code);
         // Prefer access code for attempt create — same path multiplayer join uses
-        const attempt = withMigratedConfig(
-          await api.createAttempt(heat.access_code || heat.heat_id, {
-            player_name: playerName,
-          }),
-        );
+        const created = await api.createAttempt(heat.access_code || heat.heat_id, {
+          player_name: playerName,
+        });
+        const attempt = withMigratedConfig(created.attempt);
         const opening = syncOpening(attempt);
         set({
           attempt,
@@ -231,13 +230,12 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
           set({ error: err.message, submitting: false });
           throw err;
         }
-        const attempt = withMigratedConfig(
-          await api.createAttempt(key, {
-            player_name: playerName,
-            is_official: isOfficial || undefined,
-            player_identity: isOfficial ? identity : undefined,
-          }),
-        );
+        const created = await api.createAttempt(key, {
+          player_name: playerName,
+          is_official: isOfficial || undefined,
+          player_identity: isOfficial ? identity : undefined,
+        });
+        const attempt = withMigratedConfig(created.attempt);
         const opening = syncOpening(attempt);
         set({
           attempt,
@@ -397,9 +395,8 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
     const heatId = attempt.heat_id;
     set({ error: null, submitting: true });
     try {
-      const next = withMigratedConfig(
-        await api.createAttempt(heatId, { player_name: playerName }),
-      );
+      const created = await api.createAttempt(heatId, { player_name: playerName });
+      const next = withMigratedConfig(created.attempt);
       const opening = syncOpening(next);
       set({
         attempt: next,
@@ -420,11 +417,10 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
       // Heat may be full — create a new solo heat instead
       try {
         const heat = await api.createHeat({ solo: true, player_name: playerName });
-        const next = withMigratedConfig(
-          await api.createAttempt(heat.heat_id, {
-            player_name: playerName,
-          }),
-        );
+        const createdSolo = await api.createAttempt(heat.heat_id, {
+          player_name: playerName,
+        });
+        const next = withMigratedConfig(createdSolo.attempt);
         const opening = syncOpening(next);
         set({
           attempt: next,

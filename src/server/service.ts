@@ -15,7 +15,7 @@ import {
   type RoundRecord,
 } from "@/engine";
 import { ApiError } from "./errors";
-import { makeAccessCode, makeId } from "./ids";
+import { makeAccessCode, makeId, makePlayerToken } from "./ids";
 import {
   heatBoard,
   rankForAttempt,
@@ -74,8 +74,10 @@ function heatAttempts(
 }
 
 function uniqueAccessCode(codes: Record<string, string>, solo: boolean): string {
+  // Solo: shorter SOLO-XXXXXX; multiplayer classroom: 8-char codes for QR/share.
+  const len = solo ? 6 : 8;
   for (let i = 0; i < 20; i++) {
-    const raw = makeAccessCode();
+    const raw = makeAccessCode(len);
     const code = solo ? `SOLO-${raw}` : raw;
     if (!codes[codeIndexKey(code)]) return code;
   }
@@ -271,10 +273,16 @@ export interface CreateAttemptBody {
   is_official?: boolean;
 }
 
+export interface CreateAttemptResult {
+  attempt: Attempt;
+  /** Shown once — client must store and send as X-Player-Token. */
+  player_token: string;
+}
+
 export async function createAttempt(
   heatIdOrCode: string,
   body: CreateAttemptBody,
-): Promise<Attempt> {
+): Promise<CreateAttemptResult> {
   return updateStore((store) => {
     const heat = resolveHeatId(store, heatIdOrCode);
     if (!heat) {
@@ -292,6 +300,8 @@ export async function createAttempt(
       );
     }
 
+    // Soft identity lock only when client supplies one (optional).
+    // Room gate is access_code + QR — not email OTP.
     const identity = body.player_identity?.trim() || null;
     const isOfficial = body.is_official === true;
     if (isOfficial && identity) {
@@ -309,6 +319,7 @@ export async function createAttempt(
     const config = heat.configuration;
     const attempt_id = makeId("att");
     const name = (body.player_name ?? "").trim() || "Player";
+    const player_token = makePlayerToken();
 
     const attempt: ServerAttempt = {
       attempt_id,
@@ -329,12 +340,16 @@ export async function createAttempt(
       event_id: heat.event_id,
       is_official: isOfficial,
       player_identity: identity,
+      player_token,
     };
 
     store.attempts[attempt_id] = attempt;
     heat.attempt_ids.push(attempt_id);
 
-    return publicAttempt(attempt);
+    return {
+      attempt: publicAttempt(attempt),
+      player_token,
+    };
   });
 }
 

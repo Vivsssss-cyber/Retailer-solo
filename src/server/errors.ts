@@ -13,6 +13,8 @@ export type ErrorCode =
   | "CONFIG_NOT_FOUND"
   | "EVENT_NOT_FOUND"
   | "BAD_REQUEST"
+  | "FORBIDDEN"
+  | "RATE_LIMITED"
   | "INTERNAL";
 
 const HTTP_BY_CODE: Record<ErrorCode, number> = {
@@ -28,6 +30,8 @@ const HTTP_BY_CODE: Record<ErrorCode, number> = {
   CONFIG_NOT_FOUND: 404,
   EVENT_NOT_FOUND: 404,
   BAD_REQUEST: 400,
+  FORBIDDEN: 401,
+  RATE_LIMITED: 429,
   INTERNAL: 500,
 };
 

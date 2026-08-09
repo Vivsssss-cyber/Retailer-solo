@@ -17,9 +17,11 @@ import {
   type RoundRecord,
 } from "@/engine";
 import { loadAdminConfig, saveAdminConfig } from "@/lib/adminConfigStore";
+import { persistPlayerToken, readPlayerToken } from "@/lib/playerTokenStore";
 import type {
   CompleteAttemptResponse,
   CreateAttemptRequest,
+  CreateAttemptResponse,
   CreateHeatRequest,
   CreateHeatResponse,
   RetailerChallengeApi,
@@ -33,6 +35,7 @@ import { errorWithCode } from "./apiErrors";
 type MockAttempt = Attempt & {
   is_official?: boolean;
   player_identity?: string | null;
+  player_token?: string;
 };
 
 /** Active event config (admin overrides DEFAULT_CONFIG via localStorage). */
@@ -102,8 +105,30 @@ function id(prefix: string) {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`;
 }
 
-function code() {
-  return Math.random().toString(36).slice(2, 8).toUpperCase();
+/** Multiplayer: 8 chars; solo uses SOLO- + 6. */
+function code(length = 8) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < length; i++) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)]!;
+  }
+  return out;
+}
+
+function playerToken(): string {
+  return `mock_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+}
+
+function assertMockPlayerToken(attempt: MockAttempt): void {
+  const expected = attempt.player_token;
+  if (!expected) return; // legacy mock rows before token field
+  const got = readPlayerToken(attempt.attempt_id);
+  if (!got || got !== expected) {
+    throw errorWithCode(
+      "FORBIDDEN",
+      "Missing or invalid player token for this attempt.",
+    );
+  }
 }
 
 function toPublicAttempt(a: MockAttempt): Attempt {
@@ -244,7 +269,7 @@ export const mockAdapter: RetailerChallengeApi = {
     const store = load();
     const configuration = activeConfig();
     const heat_id = id("heat");
-    const access_code = body.solo ? `SOLO-${code()}` : code();
+    const access_code = body.solo ? `SOLO-${code(6)}` : code(8);
     store.heats[heat_id] = {
       heat_id,
       access_code,
@@ -258,12 +283,15 @@ export const mockAdapter: RetailerChallengeApi = {
     return { heat_id, access_code, configuration };
   },
 
-  async createAttempt(heatId: string, body: CreateAttemptRequest): Promise<Attempt> {
+  async createAttempt(
+    heatId: string,
+    body: CreateAttemptRequest,
+  ): Promise<CreateAttemptResponse> {
     const store = load();
     const key = normalizeHeatKey(heatId);
     let heat = store.heats[key] ?? store.heats[heatId.trim()];
     if (!heat) {
-      // allow join by access code (case/space insensitive)
+      // allow join by access code (case/space insensitive) — same as QR ?code=
       const byCode =
         store.codes[key] ??
         store.codes[codeIndexKey(heatId)] ??
@@ -312,6 +340,7 @@ export const mockAdapter: RetailerChallengeApi = {
     }
 
     const attempt_id = id("att");
+    const token = playerToken();
     const attempt: MockAttempt = {
       attempt_id,
       heat_id: heat.heat_id,
@@ -327,17 +356,20 @@ export const mockAdapter: RetailerChallengeApi = {
       started_at: new Date().toISOString(),
       is_official: isOfficial,
       player_identity: identity,
+      player_token: token,
     };
     store.attempts[attempt_id] = attempt;
     heat.attempt_ids.push(attempt_id);
     save(store);
-    return toPublicAttempt(attempt);
+    persistPlayerToken(attempt_id, token);
+    return { attempt: toPublicAttempt(attempt), player_token: token };
   },
 
   async getAttempt(attemptId: string) {
     const store = load();
     const a = store.attempts[attemptId];
     if (!a) return null;
+    assertMockPlayerToken(a);
     return toPublicAttempt(a);
   },
 
@@ -345,6 +377,7 @@ export const mockAdapter: RetailerChallengeApi = {
     const store = load();
     const attempt = store.attempts[attemptId];
     if (!attempt) throw errorWithCode("ATTEMPT_NOT_FOUND", "Attempt not found");
+    assertMockPlayerToken(attempt);
     if (attempt.status === "completed") {
       throw errorWithCode("ATTEMPT_COMPLETED", "Attempt completed");
     }
@@ -377,6 +410,7 @@ export const mockAdapter: RetailerChallengeApi = {
     const store = load();
     const attempt = store.attempts[attemptId];
     if (!attempt) throw new Error("Attempt not found");
+    assertMockPlayerToken(attempt);
     const report = calculateReport(attempt.rounds);
     const heat = store.heats[attempt.heat_id];
     const allDone =
@@ -437,6 +471,14 @@ export const mockAdapter: RetailerChallengeApi = {
       );
     const rows = attempts.map((a, i) => toLeaderboardRow(a, i + 1));
     return sortFinal(rows);
+  },
+
+  async adminLogin(_pin: string) {
+    return { ok: true as const };
+  },
+
+  async adminLogout() {
+    return { ok: true as const };
   },
 
   async getAdminData() {

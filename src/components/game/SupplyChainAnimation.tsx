@@ -11,13 +11,16 @@ import {
   Trophy,
 } from "@/components/cyan/PixelIcons";
 import StatusView from "@/components/game/StatusView";
-import { readPlayerAvatarSrc } from "@/lib/playerProfile";
+import {
+  readPlayerAvatarSrc,
+  subscribePlayerProfile,
+} from "@/lib/playerProfile";
 import type { Attempt, LeaderboardRow, RoundRecord } from "@/engine";
 import { livePositionFor } from "./ChallengeHeader";
 
 function usePlayerAvatar(): string | null {
   return useSyncExternalStore(
-    () => () => {},
+    subscribePlayerProfile,
     readPlayerAvatarSrc,
     () => null,
   );

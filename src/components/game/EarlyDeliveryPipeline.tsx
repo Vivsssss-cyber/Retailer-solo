@@ -6,11 +6,14 @@ import { Package, Truck } from "@/components/cyan/PixelIcons";
 import StatusView from "@/components/game/StatusView";
 import { buildPipelineDisplay } from "@/engine";
 import type { OpeningRoundView } from "@/engine";
-import { readPlayerAvatarSrc } from "@/lib/playerProfile";
+import {
+  readPlayerAvatarSrc,
+  subscribePlayerProfile,
+} from "@/lib/playerProfile";
 
 function usePlayerAvatar(): string | null {
   return useSyncExternalStore(
-    () => () => {},
+    subscribePlayerProfile,
     readPlayerAvatarSrc,
     () => null,
   );
