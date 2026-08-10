@@ -1,6 +1,7 @@
 import type { GameConfig } from "@/engine";
 import { isHeatId, normalizeHeatKey } from "@/lib/heatKey";
-import type { RetailerChallengeApi } from "./types";
+import { persistPlayerToken, readPlayerToken } from "@/lib/playerTokenStore";
+import type { CreateAttemptResponse, RetailerChallengeApi } from "./types";
 import { mockAdapter } from "./mockAdapter";
 import { ApiRequestError } from "./apiErrors";
 
@@ -39,7 +40,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiRequestError(message, res.status, code);
   }
-  return res.json() as Promise<T>;
+  return res.json() as T;
+}
+
+function playerHeaders(attemptId: string): HeadersInit {
+  const token = readPlayerToken(attemptId);
+  return token ? { "X-Player-Token": token } : {};
 }
 
 /** Route create-attempt: heat_ ids vs access codes (by-code path). */
@@ -64,17 +70,23 @@ const liveApi: RetailerChallengeApi = {
     request(`/configurations/${encodeURIComponent(config.configuration_id || "default")}`, {
       method: "PUT",
       body: JSON.stringify(config),
+      // Cookie session after adminLogin — no PIN in client bundle
     }),
   createHeat: (body) =>
     request(`/heats`, { method: "POST", body: JSON.stringify(body) }),
-  createAttempt: (heatId, body) =>
-    request(attemptPath(heatId), {
+  createAttempt: async (heatId, body) => {
+    const result = await request<CreateAttemptResponse>(attemptPath(heatId), {
       method: "POST",
       body: JSON.stringify(body),
-    }),
+    });
+    persistPlayerToken(result.attempt.attempt_id, result.player_token);
+    return result;
+  },
   getAttempt: async (attemptId) => {
     try {
-      return await request(`/attempts/${encodeURIComponent(attemptId)}`);
+      return await request(`/attempts/${encodeURIComponent(attemptId)}`, {
+        headers: playerHeaders(attemptId),
+      });
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 404) return null;
       throw err;
@@ -84,10 +96,12 @@ const liveApi: RetailerChallengeApi = {
     request(`/attempts/${encodeURIComponent(attemptId)}/rounds`, {
       method: "POST",
       body: JSON.stringify(body),
+      headers: playerHeaders(attemptId),
     }),
   completeAttempt: (attemptId) =>
     request(`/attempts/${encodeURIComponent(attemptId)}/complete`, {
       method: "POST",
+      headers: playerHeaders(attemptId),
     }),
   getHeatLeaderboard: (heatId, mode) =>
     request(`${heatPath(heatId, "/leaderboard")}?mode=${mode}`),
@@ -95,7 +109,7 @@ const liveApi: RetailerChallengeApi = {
     request(
       `/events/default/global-leaderboard?configuration_id=${encodeURIComponent(configurationId)}`,
     ),
-  adminLogin: (pin) =>
+  adminLogin: (pin: string) =>
     request(`/admin/login`, {
       method: "POST",
       body: JSON.stringify({ pin }),
@@ -103,21 +117,24 @@ const liveApi: RetailerChallengeApi = {
   adminLogout: () =>
     request(`/admin/logout`, {
       method: "POST",
-    }).then(() => undefined),
+      body: JSON.stringify({}),
+    }),
   getAdminSession: () => request(`/admin/session`),
   getAdminData: () => request(`/admin/data`),
   clearAdminData: () =>
     request(`/admin/clear`, {
       method: "POST",
-    }).then(() => undefined),
+      body: JSON.stringify({}),
+    }),
   toggleHeatStatus: (heatId) =>
     request(`/admin/heats/${encodeURIComponent(heatId)}`, {
       method: "POST",
+      body: JSON.stringify({}),
     }),
   deleteHeat: (heatId) =>
     request(`/admin/heats/${encodeURIComponent(heatId)}`, {
       method: "DELETE",
-    }).then(() => undefined),
+    }),
 };
 
 export const api: RetailerChallengeApi = USE_MOCK ? mockAdapter : liveApi;

@@ -11,13 +11,16 @@ import {
   Trophy,
 } from "@/components/cyan/PixelIcons";
 import StatusView from "@/components/game/StatusView";
-import { readPlayerAvatarSrc } from "@/lib/playerProfile";
+import {
+  readPlayerAvatarSrc,
+  subscribePlayerProfile,
+} from "@/lib/playerProfile";
 import type { Attempt, LeaderboardRow, RoundRecord } from "@/engine";
 import { livePositionFor } from "./ChallengeHeader";
 
 function usePlayerAvatar(): string | null {
   return useSyncExternalStore(
-    () => () => {},
+    subscribePlayerProfile,
     readPlayerAvatarSrc,
     () => null,
   );
@@ -89,47 +92,40 @@ export function SupplyChainAnimation({
     incomingDemand: record.customer_demand + record.opening_backlog,
   };
 
+  const layout = (
+    <SummaryLayout
+      unit={unit}
+      record={record}
+      attempt={attempt}
+      config={config}
+      statusData={statusData}
+      backlog={backlog}
+      fulfilled={fulfilled}
+      pos={pos}
+      leaderboard={leaderboard}
+      isFinalRound={isFinalRound}
+      onContinue={onContinue}
+      playerAvatar={playerAvatar}
+      animated={!reduce}
+    />
+  );
+
   if (reduce) {
     return (
-      <SummaryLayout
-        unit={unit}
-        record={record}
-        attempt={attempt}
-        config={config}
-        statusData={statusData}
-        backlog={backlog}
-        fulfilled={fulfilled}
-        pos={pos}
-        leaderboard={leaderboard}
-        isFinalRound={isFinalRound}
-        onContinue={onContinue}
-        playerAvatar={playerAvatar}
-      />
+      <div className="flex flex-col flex-1 min-h-0 w-full max-w-full overflow-hidden">
+        {layout}
+      </div>
     );
   }
 
   return (
     <motion.div
-      className="flex flex-col gap-3 w-full max-w-full overflow-x-hidden"
+      className="flex flex-col flex-1 min-h-0 w-full max-w-full overflow-hidden"
       variants={containerVariants}
       initial="hidden"
       animate="show"
     >
-      <SummaryLayout
-        unit={unit}
-        record={record}
-        attempt={attempt}
-        config={config}
-        statusData={statusData}
-        backlog={backlog}
-        fulfilled={fulfilled}
-        pos={pos}
-        leaderboard={leaderboard}
-        isFinalRound={isFinalRound}
-        onContinue={onContinue}
-        playerAvatar={playerAvatar}
-        animated
-      />
+      {layout}
     </motion.div>
   );
 }
@@ -177,128 +173,133 @@ function SummaryLayout({
 
   return (
     <>
-      <Wrap className="flex flex-col gap-1" {...wrapProps}>
-        <h1
-          className="text-[18px] sm:text-[22px]"
-          style={{
-            fontFamily: FO,
-            fontWeight: 800,
-            color: "var(--sv-ink)",
-            letterSpacing: "-0.3px",
-            lineHeight: 1.2,
-          }}
-        >
-          {unit} {record.round} Summary
-        </h1>
-        <p
-          style={{
-            fontFamily: FO,
-            fontSize: 13,
-            color: "var(--sv-text-secondary)",
-            lineHeight: 1.45,
-          }}
-        >
-          <span style={{ fontWeight: 600, color: "var(--sv-ink)" }}>
-            {attempt.player_name}
-          </span>
-          {" · "}
-          Ordered{" "}
-          <span
-            className="sv-tabular"
-            style={{ fontWeight: 700, color: "var(--sv-ink)" }}
+      {/* Scrollable body — rail + KPIs; CTA stays pinned below */}
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain [-webkit-overflow-scrolling:touch] flex flex-col gap-2 sm:gap-3 pr-0.5">
+        <Wrap className="flex flex-col gap-0.5 sm:gap-1 shrink-0" {...wrapProps}>
+          <h1
+            className="text-[16px] sm:text-[20px] md:text-[22px]"
+            style={{
+              fontFamily: FO,
+              fontWeight: 800,
+              color: "var(--sv-ink)",
+              letterSpacing: "-0.3px",
+              lineHeight: 1.2,
+            }}
           >
-            {record.placed_order}
-          </span>
-          {" · "}
-          Demand{" "}
-          <span
-            className="sv-tabular"
-            style={{ fontWeight: 700, color: "var(--sv-ink)" }}
+            {unit} {record.round} Summary
+          </h1>
+          <p
+            className="text-[12px] sm:text-[13px]"
+            style={{
+              fontFamily: FO,
+              color: "var(--sv-text-secondary)",
+              lineHeight: 1.4,
+            }}
           >
-            {record.customer_demand}
-          </span>
-          {" · "}
-          Delay {config.delivery_delay} {unit.toLowerCase()}
-          {config.delivery_delay === 1 ? "" : "s"}
-        </p>
-      </Wrap>
+            <span style={{ fontWeight: 600, color: "var(--sv-ink)" }}>
+              {attempt.player_name}
+            </span>
+            {" · "}
+            Ordered{" "}
+            <span
+              className="sv-tabular"
+              style={{ fontWeight: 700, color: "var(--sv-ink)" }}
+            >
+              {record.placed_order}
+            </span>
+            {" · "}
+            Demand{" "}
+            <span
+              className="sv-tabular"
+              style={{ fontWeight: 700, color: "var(--sv-ink)" }}
+            >
+              {record.customer_demand}
+            </span>
+            {" · "}
+            Delay {config.delivery_delay} {unit.toLowerCase()}
+            {config.delivery_delay === 1 ? "" : "s"}
+          </p>
+        </Wrap>
 
-      <Wrap {...wrapProps}>
-        <StatusView
-          data={statusData}
-          showSimulation
-          playerAvatarSrc={playerAvatar}
-          playerName={attempt.player_name}
-        />
-      </Wrap>
+        <Wrap className="min-w-0 shrink-0" {...wrapProps}>
+          <StatusView
+            data={statusData}
+            showSimulation
+            playerAvatarSrc={playerAvatar}
+            playerName={attempt.player_name}
+          />
+        </Wrap>
 
-      <Wrap
-        className="grid grid-cols-2 sm:grid-cols-4 gap-2"
-        {...(animated
-          ? {
-              variants: {
-                hidden: {},
-                show: {
-                  transition: { staggerChildren: 0.04, delayChildren: 0.02 },
+        <Wrap
+          className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 shrink-0"
+          {...(animated
+            ? {
+                variants: {
+                  hidden: {},
+                  show: {
+                    transition: { staggerChildren: 0.04, delayChildren: 0.02 },
+                  },
                 },
-              },
+              }
+            : {})}
+        >
+          <KpiCard
+            animated={animated}
+            icon={<Package size={14} color="var(--sv-teal-mid)" />}
+            title="Delivery"
+            value={`${record.incoming_delivery}/${record.scheduled_order}`}
+            hint="In / scheduled"
+          />
+          <KpiCard
+            animated={animated}
+            icon={<Package size={14} color="var(--sv-teal-mid)" />}
+            title="Inventory"
+            value={String(record.ending_inventory)}
+            hint="Closing stock"
+            valueColor={
+              record.ending_inventory === 0 ? "var(--sv-warning)" : undefined
             }
-          : {})}
-      >
-        <KpiCard
-          animated={animated}
-          icon={<Package size={16} color="var(--sv-teal-mid)" />}
-          title="Delivery"
-          value={`${record.incoming_delivery}/${record.scheduled_order}`}
-          hint="In / scheduled"
-        />
-        <KpiCard
-          animated={animated}
-          icon={<Package size={16} color="var(--sv-teal-mid)" />}
-          title="Inventory"
-          value={String(record.ending_inventory)}
-          hint="Closing stock"
-          valueColor={
-            record.ending_inventory === 0 ? "var(--sv-warning)" : undefined
-          }
-        />
-        <KpiCard
-          animated={animated}
-          icon={
-            <TrendingUp
-              size={16}
-              color={backlog > 0 ? "var(--sv-negative)" : "var(--sv-positive)"}
-            />
-          }
-          title="Backlog"
-          value={String(backlog)}
-          hint="Unfulfilled"
-          valueColor={backlog > 0 ? "var(--sv-negative)" : "var(--sv-positive)"}
-        />
-        <KpiCard
-          animated={animated}
-          icon={<CheckCircle2 size={16} color="var(--sv-teal-mid)" />}
-          title="Cost"
-          value={`$${record.cumulative_cost.toLocaleString()}`}
-          hint={`+$${record.round_cost.toLocaleString()} this ${unit.toLowerCase()}`}
-        />
-      </Wrap>
+          />
+          <KpiCard
+            animated={animated}
+            icon={
+              <TrendingUp
+                size={14}
+                color={backlog > 0 ? "var(--sv-negative)" : "var(--sv-positive)"}
+              />
+            }
+            title="Backlog"
+            value={String(backlog)}
+            hint="Unfulfilled"
+            valueColor={backlog > 0 ? "var(--sv-negative)" : "var(--sv-positive)"}
+          />
+          <KpiCard
+            animated={animated}
+            icon={<CheckCircle2 size={14} color="var(--sv-teal-mid)" />}
+            title="Cost"
+            value={`$${record.cumulative_cost.toLocaleString()}`}
+            hint={`+$${record.round_cost.toLocaleString()} this ${unit.toLowerCase()}`}
+          />
+        </Wrap>
+      </div>
 
+      {/* Pinned footer — always reachable on short viewports */}
       <Wrap
-        className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3"
+        className="shrink-0 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-2 sm:gap-3 mt-2"
         style={{
           ...cardStyle,
-          padding: 14,
+          padding: "10px 12px",
         }}
         {...wrapProps}
       >
         {pos != null ? (
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Trophy size={16} color="var(--sv-teal-mid)" />
+          <div className="flex items-center gap-2 min-w-0">
+            <Trophy size={15} color="var(--sv-teal-mid)" />
             <p
+              className="truncate"
               style={{
                 fontFamily: FO,
-                fontSize: 13,
+                fontSize: 12,
                 color: "var(--sv-text-secondary)",
               }}
             >
@@ -308,7 +309,7 @@ function SummaryLayout({
                 style={{
                   fontWeight: 800,
                   color: "var(--sv-teal-mid)",
-                  fontSize: 15,
+                  fontSize: 14,
                 }}
               >
                 #{pos}
@@ -321,9 +322,9 @@ function SummaryLayout({
           </div>
         ) : (
           <p
+            className="text-[12px] sm:text-[13px]"
             style={{
               fontFamily: FO,
-              fontSize: 13,
               color: "var(--sv-text-secondary)",
             }}
           >
@@ -334,7 +335,7 @@ function SummaryLayout({
           type="button"
           onClick={onContinue}
           size="lg"
-          className="w-full sm:w-auto touch-manipulation"
+          className="w-full sm:w-auto touch-manipulation shrink-0"
         >
           {isFinalRound
             ? "View final report"
@@ -360,15 +361,19 @@ function KpiCard({
   valueColor?: string;
   animated?: boolean;
 }) {
+  const kpiCardChrome = { ...cardStyle, padding: 0 as const };
   const inner = (
-    <div style={{ ...cardStyle, padding: 12, height: "100%" }}>
-      <div className="flex items-center gap-1.5 mb-1.5">
+    <div
+      className="h-full px-2 py-2 sm:px-3 sm:py-3"
+      style={kpiCardChrome}
+    >
+      <div className="flex items-center gap-1 sm:gap-1.5 mb-1 sm:mb-1.5">
         {icon}
         <span
           style={{
             fontFamily: FO,
             fontWeight: 600,
-            fontSize: 11,
+            fontSize: 10,
             color: "var(--sv-text-secondary)",
           }}
         >
@@ -376,11 +381,10 @@ function KpiCard({
         </span>
       </div>
       <p
-        className="sv-tabular"
+        className="sv-tabular text-[17px] sm:text-[20px]"
         style={{
           fontFamily: FO,
           fontWeight: 800,
-          fontSize: 20,
           color: valueColor ?? "var(--sv-ink)",
           lineHeight: 1.15,
           letterSpacing: "-0.3px",
@@ -389,11 +393,10 @@ function KpiCard({
         {value}
       </p>
       <p
+        className="text-[10px] sm:text-[11px] mt-0.5"
         style={{
           fontFamily: FO,
-          fontSize: 11,
           color: "var(--sv-text-secondary)",
-          marginTop: 2,
         }}
       >
         {hint}

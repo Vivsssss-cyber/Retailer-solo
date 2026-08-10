@@ -18,7 +18,48 @@ export interface Persona {
 
 export const PERSONA_AVATAR_PLACEHOLDER = "/characters/avatars/avatar-placeholder.svg";
 
-export const COACH_AVATAR_SRC = "/characters/game-marketing-expert.png";
+/**
+ * Coach pose set (pixel marketing expert).
+ * Art lives at public/characters/coach/coach-*-v2.png
+ */
+export type CoachExpression =
+  | "neutral"
+  | "explain"
+  | "thinking"
+  | "alert"
+  | "celebrate";
+
+export const COACH_EXPRESSIONS: Record<CoachExpression, string> = {
+  neutral: "/characters/coach/coach-neutral-v2.png",
+  explain: "/characters/coach/coach-explain-v2.png",
+  thinking: "/characters/coach/coach-thinking-v2.png",
+  alert: "/characters/coach/coach-alert-v2.png",
+  celebrate: "/characters/coach/coach-celebrate-v2.png",
+};
+
+/** Default / idle pose — standing, slight smile. */
+export const COACH_AVATAR_SRC = COACH_EXPRESSIONS.neutral;
+
+/** Map play-overlay tones → expressive poses. */
+export function coachExpressionForTone(
+  tone: "ok" | "warn" | "danger" | "tip",
+): CoachExpression {
+  switch (tone) {
+    case "ok":
+      return "celebrate";
+    case "warn":
+      return "thinking";
+    case "danger":
+      return "alert";
+    case "tip":
+    default:
+      return "explain";
+  }
+}
+
+export function coachSrc(expression: CoachExpression = "neutral"): string {
+  return COACH_EXPRESSIONS[expression] ?? COACH_EXPRESSIONS.neutral;
+}
 
 export const PERSONAS: Persona[] = [
   {

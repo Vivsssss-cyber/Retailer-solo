@@ -64,25 +64,47 @@ const customStyles = `
   width: var(--sv-avatar-size, 64px);
   height: var(--sv-avatar-size, 64px);
 }
-/* Phones: shrink rail nodes so 3 stages + labels fit without overflow */
+/* Phones: denser rail so round summary fits without endless scroll */
 @media (max-width: 640px) {
   .sv-status-view--sim {
-    --sv-node-size: 56px;
-    --sv-icon-well: 36px;
-    --sv-rail-top: 64px;
-    --sv-avatar-size: 48px;
-    padding: 12px 10px 10px !important;
+    --sv-node-size: 48px;
+    --sv-icon-well: 32px;
+    --sv-rail-top: 52px;
+    --sv-avatar-size: 40px;
+    --sv-marker-lift-y: -48px;
+    padding: 10px 8px 8px !important;
   }
   .sv-status-view:not(.sv-status-view--sim) {
-    --sv-node-size: 52px;
-    --sv-icon-well: 34px;
+    --sv-node-size: 48px;
+    --sv-icon-well: 32px;
   }
   .sv-status-stage-label {
-    font-size: 11px !important;
+    font-size: 10px !important;
   }
   .sv-status-sim-area {
-    padding-top: 72px !important;
-    min-height: 240px !important;
+    padding-top: 56px !important;
+    min-height: 172px !important;
+  }
+  .sv-float-marker-inner {
+    width: 108px !important;
+    height: 72px !important;
+  }
+  .sv-status-view--sim .sv-status-sim-area {
+    padding-bottom: 2px !important;
+  }
+}
+
+/* Very short viewports (landscape phones / small height) */
+@media (max-width: 640px) and (max-height: 700px) {
+  .sv-status-view--sim {
+    --sv-node-size: 44px;
+    --sv-icon-well: 28px;
+    --sv-avatar-size: 36px;
+    --sv-marker-lift-y: -40px;
+  }
+  .sv-status-sim-area {
+    padding-top: 44px !important;
+    min-height: 148px !important;
   }
 }
 @media (hover: hover) and (pointer: fine) {
@@ -110,7 +132,7 @@ const customStyles = `
   }
   .sv-marker-lift {
     animation: none !important;
-    transform: translateY(-84px) scale(1) !important;
+    transform: translateY(var(--sv-marker-lift-y, -84px)) scale(1) !important;
     opacity: 1 !important;
   }
 }
@@ -241,6 +263,7 @@ export default function StatusView({
           ["--sv-icon-well" as string]: `${iconWell}px`,
           ["--sv-rail-top" as string]: `${railTop}px`,
           ["--sv-avatar-size" as string]: "64px",
+          ["--sv-marker-lift-y" as string]: "-84px",
         } as React.CSSProperties
       }
     >
@@ -299,7 +322,8 @@ export default function StatusView({
         style={{
           paddingTop: showSimulation ? 96 : 12,
           paddingBottom: showPlayerAvatar ? 8 : 4,
-          minHeight: showSimulation ? (showPlayerAvatar ? 320 : 250) : 140,
+          // Desktop defaults; mobile media queries tighten with !important
+          minHeight: showSimulation ? (showPlayerAvatar ? 280 : 220) : 140,
         }}
       >
 
@@ -736,7 +760,7 @@ function FlowMarker({
         opacity: 1;
       }
       100% {
-        transform: translateY(-84px) scale(1);
+        transform: translateY(var(--sv-marker-lift-y, -84px)) scale(1);
         opacity: 1;
       }
     }

@@ -19,8 +19,13 @@ export interface HeatRecord {
 export interface ServerAttempt extends Attempt {
   event_id: string | null;
   is_official: boolean;
-  /** Email / device / auth subject for one-official-attempt lock. */
+  /**
+   * Optional soft lock key (display name email, etc.).
+   * Classroom access is heat access_code + QR — not email OTP.
+   */
   player_identity: string | null;
+  /** Ownership secret; required for attempt read/mutate. Never send on public boards. */
+  player_token: string;
 }
 
 export interface DataStore {

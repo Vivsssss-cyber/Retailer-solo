@@ -8,12 +8,6 @@ import { DEFAULT_CONFIG, migrateGameConfig, type GameConfig } from "@/engine";
 export const ADMIN_CONFIG_KEY = "retailer-challenge-admin-config-v1";
 export const ADMIN_SESSION_KEY = "retailer-challenge-admin-session";
 
-/**
- * Offline mock unlock only (localStorage game). Never used by the live API client.
- * Live admin auth is server-side: ADMIN_PIN env + HttpOnly session cookie.
- */
-export const MOCK_ADMIN_PIN = "admin";
-
 export function cloneDefaultConfig(): GameConfig {
   return structuredClone(DEFAULT_CONFIG);
 }
@@ -60,7 +54,7 @@ export function isAdminUnlocked(): boolean {
   return sessionStorage.getItem(ADMIN_SESSION_KEY) === "1";
 }
 
-/** Mark UI unlocked (sessionStorage). Live API still requires the server cookie. */
+/** Mark UI unlocked after successful mock unlock or live admin login. */
 export function markAdminUnlocked(): void {
   if (typeof window !== "undefined") {
     sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
@@ -68,11 +62,11 @@ export function markAdminUnlocked(): void {
 }
 
 /**
- * Offline mock: compare against MOCK_ADMIN_PIN and mark UI unlocked.
- * Live mode should call `api.adminLogin` instead.
+ * Mock-only local unlock (no secret in the client bundle).
+ * Live mode must call api.adminLogin(pin) then markAdminUnlocked().
  */
-export function unlockAdmin(pin: string): boolean {
-  if (pin.trim() !== MOCK_ADMIN_PIN) return false;
+export function unlockAdminMock(pin: string): boolean {
+  if (!pin.trim()) return false;
   markAdminUnlocked();
   return true;
 }
@@ -88,7 +82,7 @@ export function lockAdmin() {
  */
 export function normalizeGameConfig(input: GameConfig): GameConfig {
   const cfg = migrateGameConfig(input);
-  const total = Math.min(15, Math.max(1, Math.floor(cfg.total_rounds) || 12));
+  const total = Math.min(50, Math.max(1, Math.floor(cfg.total_rounds) || 12));
   const delay = Math.min(5, Math.max(1, Math.floor(cfg.delivery_delay) || 2));
 
   const demand = padNumArray(

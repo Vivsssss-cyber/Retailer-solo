@@ -8,14 +8,17 @@ import {
   PERSONA_AVATAR_PLACEHOLDER,
   personaBySlug,
 } from "@/lib/personas";
-import { readPlayerProfile } from "@/lib/playerProfile";
+import {
+  readPlayerProfile,
+  subscribePlayerProfile,
+} from "@/lib/playerProfile";
 import { RoundProgressBar } from "./RoundProgressBar";
 import type { Attempt } from "@/engine";
 
 /** Hydration-safe identity from localStorage (server snapshot is empty). */
 function usePlayerAvatarSrc(): string | null {
   const personaSlug = useSyncExternalStore(
-    () => () => {},
+    subscribePlayerProfile,
     () => readPlayerProfile().persona,
     () => null,
   );

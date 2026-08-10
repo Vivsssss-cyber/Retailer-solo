@@ -19,7 +19,7 @@
 | State | Zustand `src/store/useAttemptStore.ts` |
 | Engine | Pure TS `src/engine/*` (unit-tested; shared contract with backend) |
 | API | `src/services/api.ts` live · `mockAdapter.ts` default offline |
-| Charts | Recharts via `GraphicalView` (beer-game evolution style) |
+| Charts | shadcn `ui/chart` (ChartContainer/Tooltip) over Recharts, wrapped by `GraphicalView` |
 | Motion | `motion/react` |
 | Tests | Vitest (`npm test`) |
 
@@ -34,6 +34,7 @@ src/
     cyan/              # design system + PixelIcons
     game/              # play UI (KPIs, pipeline, charts, decision)
     report/            # final performance report
+    ui/                # shadcn registry components (do not hand-edit)
   engine/              # PRD formulas (source of truth for math)
   server/              # backend domain: store, service, leaderboard, errors
   services/            # client API + mock
@@ -57,7 +58,7 @@ public/
 |---|---|
 | `/` | Intro, name, solo start / join heat code |
 | `/play/[attemptId]` | Active game + report |
-| `/admin` | Admin: game numbers, demand/supply, sessions (PIN from `ADMIN_PIN` env; mock default `admin`) |
+| `/admin` | Admin: game numbers, demand/supply, sessions (server `ADMIN_PIN` env) |
 | `/admin/game` | Edit rounds, costs, starting state, coaching panels |
 | `/admin/sequences` | Per-round demand & supply rate editors |
 | `/admin/data` | Local heats/attempts + clear mock data |
@@ -67,6 +68,10 @@ public/
 ## Design non-negotiables
 
 - **Tokens only:** `var(--sv-*)` — no raw hex in new UI chrome  
+- **shadcn registry:** `components.json` + `src/components/ui/*` (chart only today). Its semantic
+  vars (`--background`, `--muted-foreground`, `--chart-*`, …) are **mapped to `--sv-*`** in
+  `globals.css` — light-only, no `.dark` block, and shadcn's `@layer base` body reset is
+  deliberately omitted. Re-running `shadcn init` re-adds all three; strip them again.  
 - **Icons:** PixelIcons only — no lucide-react, no emoji  
 - **Font:** Outfit (`next/font`) via `--sv-font-ui`  
 - **No pure black** `#000` — use `var(--sv-ink)`  
@@ -104,8 +109,8 @@ Copy `.env.example` → `.env.local`:
 |---|---|
 | `NEXT_PUBLIC_USE_MOCK` | default mock on; `"false"` for live API |
 | `NEXT_PUBLIC_API_URL` | backend base URL |
-| `ADMIN_PIN` | server-only admin PIN (required in production; dev default `admin`) |
-| `ADMIN_SESSION_SECRET` | optional HMAC secret for admin session cookies |
+| `ADMIN_PIN` | server-only admin secret (live admin + API; required in production) |
+| `DATA_DIR` | file store path for live single-node |
 
 ---
 
@@ -147,11 +152,14 @@ Copy `.env.example` → `.env.local`:
 
 ### Known backend gaps (B5–B6)
 
-- Strong identity / OTP for official one-attempt (UI lock exists; no OTP yet)  
-- Rate limits (admin login/probes only; player endpoints not limited yet)  
+- ~~Strong identity / OTP~~ (classroom uses access code + QR; optional soft identity lock — no email OTP by design)  
+- ~~Rate limits~~ (in-memory single-node; Redis if multi-instance)  
+
 - Postgres (or other multi-instance) store  
 - Staging E2E mock-off sign-off  
 - ~~Admin config → server~~ (done: PUT config + admin editor dual-write)  
+- ~~Admin PIN in client~~ (done: server env + cookie session)  
+- ~~Attempt ownership tokens~~ (done: player_token + X-Player-Token)  
 
 ### Live deploy path (this week)
 
@@ -189,10 +197,14 @@ Copy `.env.example` → `.env.local`:
 
 - `/admin` section (solo-beergame creator parity for game stats/numbers)  
 - Active config in `localStorage` (`retailer-challenge-admin-config-v1`); mock heats snapshot it  
-- Admin auth: server `ADMIN_PIN` + HttpOnly session cookie (`POST /admin/login`); rate-limited  
-- Mock offline unlock still uses local PIN `admin` (UI only; not used by live client)  
-- Admin save: mock → localStorage; live → `PUT /configurations/:id` with session cookie + local cache  
-- Scripts may send `X-Admin-Pin` (never baked into the browser bundle)  
+- Admin auth: server-only `ADMIN_PIN` env → `POST /admin/login` sets httpOnly cookie; never ship PIN in client JS  
+- Mock offline unlock: any non-empty PIN (UI sessionStorage only; not used by live client)  
+- Admin save: mock → localStorage; live → cookie session (or `X-Admin-Pin` for scripts) on `PUT /configurations/:id`  
+- Player ownership: `player_token` on createAttempt; client sends `X-Player-Token` for attempt read/mutate  
+- Classroom join: heat **access code + QR / `?code=`** (no email OTP); multiplayer codes are 8 chars  
+- Rate limits (in-memory, single-node): admin login, create heat/attempt, submit round  
+- Security headers: frame deny, nosniff, referrer, permissions, HSTS  
+
 - New live heats snapshot the **server** active config after admin save  
 
 ---

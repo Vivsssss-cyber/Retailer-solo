@@ -60,6 +60,7 @@ async function main() {
   // 3. Solo heat + attempt
   let heatId;
   let attemptId;
+  let playerToken;
   {
     const { res, body } = await req("/heats", {
       method: "POST",
@@ -78,10 +79,24 @@ async function main() {
       body: JSON.stringify({ player_name: "Smoke Tester" }),
     });
     assert(res.status === 201 || res.ok, `create attempt ${res.status}`);
-    attemptId = body.attempt_id;
-    assert(body.current_round === 1, "current_round=1");
-    assert(body.status === "playing", "status=playing");
-    assert(body.rounds?.length === 0, "empty rounds");
+    // Shape: { attempt, player_token }
+    attemptId = body.attempt?.attempt_id ?? body.attempt_id;
+    playerToken = body.player_token;
+    assert(!!attemptId, "attempt_id present");
+    assert(!!playerToken, "player_token present");
+    const att = body.attempt ?? body;
+    assert(att.current_round === 1, "current_round=1");
+    assert(att.status === "playing", "status=playing");
+    assert(att.rounds?.length === 0, "empty rounds");
+  }
+
+  const playerHeaders = { "X-Player-Token": playerToken };
+
+  // 3b. Missing token rejected
+  {
+    const { res, body } = await req(`/attempts/${encodeURIComponent(attemptId)}`);
+    assert(res.status === 401, `get without token → 401 got ${res.status}`);
+    assert(body?.code === "FORBIDDEN" || res.status === 401, "forbidden code");
   }
 
   // 4. Round 1 submit
@@ -90,6 +105,7 @@ async function main() {
     const { res, body } = await req(`/attempts/${encodeURIComponent(attemptId)}/rounds`, {
       method: "POST",
       body: JSON.stringify({ round: 1, placed_order: 6 }),
+      headers: playerHeaders,
     });
     assert(res.ok, `submit r1 ${res.status} ${JSON.stringify(body)}`);
     assert(body.accepted === true, "accepted");
@@ -104,6 +120,7 @@ async function main() {
     const { res, body } = await req(`/attempts/${encodeURIComponent(attemptId)}/rounds`, {
       method: "POST",
       body: JSON.stringify({ round: 1, placed_order: 99 }),
+      headers: playerHeaders,
     });
     assert(res.status === 409, `double-submit status 409 got ${res.status}`);
     assert(
@@ -114,7 +131,9 @@ async function main() {
 
   // 6. Resume mid-game
   {
-    const { res, body } = await req(`/attempts/${encodeURIComponent(attemptId)}`);
+    const { res, body } = await req(`/attempts/${encodeURIComponent(attemptId)}`, {
+      headers: playerHeaders,
+    });
     assert(res.ok, `get attempt ${res.status}`);
     assert(body.current_round === 2, "resume current_round=2");
     assert(body.inventory === afterR1.inventory, "resume inventory match");
@@ -133,6 +152,7 @@ async function main() {
         {
           method: "POST",
           body: JSON.stringify({ round: r, placed_order: 6 }),
+          headers: playerHeaders,
         },
       );
       assert(res.ok, `submit r${r} ${res.status}`);
@@ -148,6 +168,7 @@ async function main() {
     const { res, body } = await req(`/attempts/${encodeURIComponent(attemptId)}/rounds`, {
       method: "POST",
       body: JSON.stringify({ round: 13, placed_order: 1 }),
+      headers: playerHeaders,
     });
     assert(res.status === 409, `r13 rejected 409 got ${res.status}`);
     assert(!!body?.code, `r13 has code ${body?.code}`);
@@ -157,12 +178,24 @@ async function main() {
   {
     const { res, body } = await req(
       `/attempts/${encodeURIComponent(attemptId)}/complete`,
-      { method: "POST" },
+      { method: "POST", headers: playerHeaders },
     );
     assert(res.ok, `complete ${res.status}`);
     assert(typeof body.report?.final_cumulative_cost === "number", "report cost");
     assert(body.heat_rank === 1, "solo heat_rank=1");
     assert(Array.isArray(body.live_heat_board), "live_heat_board array");
+  }
+
+  // 9b. Admin login + data (dev default PIN if ADMIN_PIN unset)
+  {
+    const pin = process.env.ADMIN_PIN || "Cyan#866$R3t@il";
+    const { res, body } = await req("/admin/login", {
+      method: "POST",
+      body: JSON.stringify({ pin }),
+    });
+    assert(res.ok, `admin login ${res.status} ${JSON.stringify(body)}`);
+    const setCookie = res.headers.get("set-cookie") || "";
+    assert(setCookie.includes("rc_admin_session"), "admin session cookie set");
   }
 
   // 10. Heat full (solo max 1)
