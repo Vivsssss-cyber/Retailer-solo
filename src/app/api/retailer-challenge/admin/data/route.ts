@@ -1,4 +1,4 @@
-import { requireAdminPin } from "@/server/adminAuth";
+import { requireAdmin } from "@/server/adminAuth";
 import { jsonError, jsonOk } from "@/server/http";
 import { getAdminData, getAdminStats } from "@/server/service";
 
@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
-    requireAdminPin(request);
+    requireAdmin(request);
     const data = getAdminData();
     const stats = getAdminStats();
     return jsonOk({ ...data, stats });

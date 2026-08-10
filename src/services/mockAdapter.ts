@@ -16,7 +16,13 @@ import {
   type LeaderboardRow,
   type RoundRecord,
 } from "@/engine";
-import { loadAdminConfig, saveAdminConfig } from "@/lib/adminConfigStore";
+import {
+  isAdminUnlocked,
+  loadAdminConfig,
+  saveAdminConfig,
+  unlockAdmin,
+  lockAdmin,
+} from "@/lib/adminConfigStore";
 import type {
   CompleteAttemptResponse,
   CreateAttemptRequest,
@@ -437,6 +443,21 @@ export const mockAdapter: RetailerChallengeApi = {
       );
     const rows = attempts.map((a, i) => toLeaderboardRow(a, i + 1));
     return sortFinal(rows);
+  },
+
+  async adminLogin(pin: string) {
+    if (!unlockAdmin(pin)) {
+      throw errorWithCode("UNAUTHORIZED", "Incorrect PIN");
+    }
+    return { ok: true as const };
+  },
+
+  async adminLogout() {
+    lockAdmin();
+  },
+
+  async getAdminSession() {
+    return { authenticated: isAdminUnlocked() };
   },
 
   async getAdminData() {

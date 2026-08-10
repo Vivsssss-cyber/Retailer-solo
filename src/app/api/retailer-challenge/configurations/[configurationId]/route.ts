@@ -1,5 +1,5 @@
 import type { GameConfig } from "@/engine";
-import { requireAdminPin } from "@/server/adminAuth";
+import { requireAdmin } from "@/server/adminAuth";
 import { ApiError } from "@/server/errors";
 import { jsonError, jsonOk, parseJson } from "@/server/http";
 import { getConfiguration, upsertConfiguration } from "@/server/service";
@@ -24,7 +24,7 @@ export async function PUT(
   context: { params: Promise<{ configurationId: string }> },
 ) {
   try {
-    requireAdminPin(request);
+    requireAdmin(request);
     const { configurationId } = await context.params;
     const body = await parseJson<GameConfig>(request);
     if (!body || typeof body !== "object") {

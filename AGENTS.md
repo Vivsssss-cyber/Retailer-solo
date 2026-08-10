@@ -57,7 +57,7 @@ public/
 |---|---|
 | `/` | Intro, name, solo start / join heat code |
 | `/play/[attemptId]` | Active game + report |
-| `/admin` | Admin: game numbers, demand/supply, sessions (PIN `admin`) |
+| `/admin` | Admin: game numbers, demand/supply, sessions (PIN from `ADMIN_PIN` env; mock default `admin`) |
 | `/admin/game` | Edit rounds, costs, starting state, coaching panels |
 | `/admin/sequences` | Per-round demand & supply rate editors |
 | `/admin/data` | Local heats/attempts + clear mock data |
@@ -104,6 +104,8 @@ Copy `.env.example` → `.env.local`:
 |---|---|
 | `NEXT_PUBLIC_USE_MOCK` | default mock on; `"false"` for live API |
 | `NEXT_PUBLIC_API_URL` | backend base URL |
+| `ADMIN_PIN` | server-only admin PIN (required in production; dev default `admin`) |
+| `ADMIN_SESSION_SECRET` | optional HMAC secret for admin session cookies |
 
 ---
 
@@ -146,7 +148,7 @@ Copy `.env.example` → `.env.local`:
 ### Known backend gaps (B5–B6)
 
 - Strong identity / OTP for official one-attempt (UI lock exists; no OTP yet)  
-- Rate limits  
+- Rate limits (admin login/probes only; player endpoints not limited yet)  
 - Postgres (or other multi-instance) store  
 - Staging E2E mock-off sign-off  
 - ~~Admin config → server~~ (done: PUT config + admin editor dual-write)  
@@ -187,8 +189,10 @@ Copy `.env.example` → `.env.local`:
 
 - `/admin` section (solo-beergame creator parity for game stats/numbers)  
 - Active config in `localStorage` (`retailer-challenge-admin-config-v1`); mock heats snapshot it  
-- PIN gate: `admin` (sessionStorage only — not production auth)  
-- Admin save: mock → localStorage; live (`USE_MOCK=false`) → `PUT /configurations/:id` with `X-Admin-Pin` + local cache  
+- Admin auth: server `ADMIN_PIN` + HttpOnly session cookie (`POST /admin/login`); rate-limited  
+- Mock offline unlock still uses local PIN `admin` (UI only; not used by live client)  
+- Admin save: mock → localStorage; live → `PUT /configurations/:id` with session cookie + local cache  
+- Scripts may send `X-Admin-Pin` (never baked into the browser bundle)  
 - New live heats snapshot the **server** active config after admin save  
 
 ---

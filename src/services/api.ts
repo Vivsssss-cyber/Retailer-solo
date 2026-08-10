@@ -1,5 +1,4 @@
 import type { GameConfig } from "@/engine";
-import { ADMIN_PIN } from "@/lib/adminConfigStore";
 import { isHeatId, normalizeHeatKey } from "@/lib/heatKey";
 import type { RetailerChallengeApi } from "./types";
 import { mockAdapter } from "./mockAdapter";
@@ -8,6 +7,7 @@ import { ApiRequestError } from "./apiErrors";
 /**
  * Live REST client — used when NEXT_PUBLIC_USE_MOCK is "false".
  * With empty NEXT_PUBLIC_API_URL, calls same-origin Next.js API routes.
+ * Admin writes use the HttpOnly session cookie (credentials: include).
  */
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== "false";
 
@@ -16,6 +16,7 @@ const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${base}/api/retailer-challenge${path}`, {
     ...init,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),
@@ -63,9 +64,6 @@ const liveApi: RetailerChallengeApi = {
     request(`/configurations/${encodeURIComponent(config.configuration_id || "default")}`, {
       method: "PUT",
       body: JSON.stringify(config),
-      headers: {
-        "X-Admin-Pin": ADMIN_PIN,
-      },
     }),
   createHeat: (body) =>
     request(`/heats`, { method: "POST", body: JSON.stringify(body) }),
@@ -97,25 +95,29 @@ const liveApi: RetailerChallengeApi = {
     request(
       `/events/default/global-leaderboard?configuration_id=${encodeURIComponent(configurationId)}`,
     ),
-  getAdminData: () =>
-    request(`/admin/data`, {
-      headers: { "X-Admin-Pin": ADMIN_PIN },
+  adminLogin: (pin) =>
+    request(`/admin/login`, {
+      method: "POST",
+      body: JSON.stringify({ pin }),
     }),
+  adminLogout: () =>
+    request(`/admin/logout`, {
+      method: "POST",
+    }).then(() => undefined),
+  getAdminSession: () => request(`/admin/session`),
+  getAdminData: () => request(`/admin/data`),
   clearAdminData: () =>
     request(`/admin/clear`, {
       method: "POST",
-      headers: { "X-Admin-Pin": ADMIN_PIN },
-    }),
+    }).then(() => undefined),
   toggleHeatStatus: (heatId) =>
     request(`/admin/heats/${encodeURIComponent(heatId)}`, {
       method: "POST",
-      headers: { "X-Admin-Pin": ADMIN_PIN },
     }),
   deleteHeat: (heatId) =>
     request(`/admin/heats/${encodeURIComponent(heatId)}`, {
       method: "DELETE",
-      headers: { "X-Admin-Pin": ADMIN_PIN },
-    }),
+    }).then(() => undefined),
 };
 
 export const api: RetailerChallengeApi = USE_MOCK ? mockAdapter : liveApi;

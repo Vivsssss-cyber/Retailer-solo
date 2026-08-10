@@ -50,7 +50,7 @@ export interface CompleteAttemptResponse {
 
 export interface RetailerChallengeApi {
   getConfiguration(configurationId?: string): Promise<GameConfig>;
-  /** Admin write — live API requires X-Admin-Pin; mock writes localStorage. */
+  /** Admin write — live API requires session cookie (or server-side X-Admin-Pin). */
   putConfiguration(config: GameConfig): Promise<GameConfig>;
   createHeat(body: CreateHeatRequest): Promise<CreateHeatResponse>;
   createAttempt(heatId: string, body: CreateAttemptRequest): Promise<Attempt>;
@@ -59,6 +59,10 @@ export interface RetailerChallengeApi {
   completeAttempt(attemptId: string): Promise<CompleteAttemptResponse>;
   getHeatLeaderboard(heatId: string, mode: "live" | "final"): Promise<LeaderboardRow[]>;
   getGlobalLeaderboard(configurationId: string): Promise<LeaderboardRow[]>;
+  /** Live: POST pin → HttpOnly cookie. Mock: local PIN check. */
+  adminLogin(pin: string): Promise<{ ok: true }>;
+  adminLogout(): Promise<void>;
+  getAdminSession(): Promise<{ authenticated: boolean }>;
   getAdminData(): Promise<{
     heats: Array<{
       heat_id: string;

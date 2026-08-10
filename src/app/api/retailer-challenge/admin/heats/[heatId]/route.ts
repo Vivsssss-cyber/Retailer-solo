@@ -1,4 +1,4 @@
-import { requireAdminPin } from "@/server/adminAuth";
+import { requireAdmin } from "@/server/adminAuth";
 import { jsonError, jsonOk } from "@/server/http";
 import { deleteHeat, toggleHeatStatus } from "@/server/service";
 
@@ -9,7 +9,7 @@ export async function POST(
   context: { params: Promise<{ heatId: string }> },
 ) {
   try {
-    requireAdminPin(request);
+    requireAdmin(request);
     const { heatId } = await context.params;
     const nextStatus = await toggleHeatStatus(heatId);
     return jsonOk({ status: nextStatus });
@@ -23,7 +23,7 @@ export async function DELETE(
   context: { params: Promise<{ heatId: string }> },
 ) {
   try {
-    requireAdminPin(request);
+    requireAdmin(request);
     const { heatId } = await context.params;
     await deleteHeat(heatId);
     return jsonOk({ ok: true });

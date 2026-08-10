@@ -58,6 +58,8 @@ const STATUS_BY_CODE: Record<string, number> = {
   ROUND_LOCKED: 409,
   ROUND_MISMATCH: 409,
   INVALID_ORDER: 400,
+  UNAUTHORIZED: 401,
+  RATE_LIMITED: 429,
 };
 
 /** Attach a machine code (mock adapter parity with live API). */
