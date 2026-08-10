@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -14,7 +14,6 @@ import {
   Package,
   Truck,
   Target,
-  Users,
   DollarSign,
 } from "@/components/cyan/PixelIcons";
 import { useAttemptStore } from "@/store/useAttemptStore";
@@ -39,13 +38,11 @@ import { hasCompletedPlayTour } from "@/lib/playTour";
 
 const COACH_LINES: Record<string, string> = {
   welcome: "I'm your coach. Before we open the warehouse — let's get you set up.",
-  mode: "Solo practice is the fastest path. Host or join when you're playing with a group.",
+  mode: "Solo practice is the fastest path. Join a room when your facilitator shares a code.",
   practiceFast: "Pick a face and a name — cosmetic only. Then we open the warehouse.",
   identity:
     "Avatar and name are cosmetic only — they never change scoring or fairness.",
-  heatCode: "Ask your host for the code. Then we can join the heat.",
-  hostShare:
-    "Share the big code or the QR with your class. Wait for players, then enter.",
+  heatCode: "Ask your facilitator for the room code. We'll take you to the join page.",
   official:
     "Official is one attempt per email — permanent for this heat. Practice is unlimited.",
   officialConfirm:
@@ -61,46 +58,15 @@ const COACH_EXPRESSIONS_BY_STEP: Record<string, CoachExpression> = {
   practiceFast: "explain",
   identity: "explain",
   heatCode: "thinking",
-  hostShare: "explain",
   official: "thinking",
   officialConfirm: "alert",
   tutorial: "explain",
   loading: "thinking",
 };
 
-type PlayMode = "solo" | "host" | "heat";
+type PlayMode = "solo" | "heat";
 
-const IDENTITY_KEY = "retailer-challenge-player-identity";
 const DEFAULT_PERSONA: PersonaSlug = "the-analyst";
-
-function readSavedIdentity(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    return sessionStorage.getItem(IDENTITY_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function saveIdentity(value: string) {
-  if (typeof window === "undefined") return;
-  try {
-    if (value) sessionStorage.setItem(IDENTITY_KEY, value);
-    else sessionStorage.removeItem(IDENTITY_KEY);
-  } catch {
-    /* ignore */
-  }
-}
-
-function readQueryHeatCode(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    const code = new URLSearchParams(window.location.search).get("code");
-    return code ? code.trim().toUpperCase() : "";
-  } catch {
-    return "";
-  }
-}
 
 // ---------------------------------------------------------
 // Helpers
@@ -291,15 +257,9 @@ function ModeScreen({
       icon: <Target size={20} color="currentColor" />,
     },
     {
-      id: "host",
-      title: "Host a Heat",
-      blurb: "Create a code and invite up to 4 players.",
-      icon: <Users size={20} color="currentColor" />,
-    },
-    {
       id: "heat",
-      title: "Join a Heat",
-      blurb: "Enter a code from your host or instructor.",
+      title: "Join a Room",
+      blurb: "Enter a code from your facilitator (or open their join link).",
       icon: <Package size={20} color="currentColor" />,
     },
   ];
@@ -719,7 +679,6 @@ function IdentityScreen({
     </GlassCard>
   );
 }
-
 function HeatCodeScreen({
   value,
   onChange,
@@ -742,7 +701,7 @@ function HeatCodeScreen({
           marginBottom: 8,
         }}
       >
-        Enter Heat Code
+        Enter Room Code
       </h2>
       <p
         style={{
@@ -752,7 +711,7 @@ function HeatCodeScreen({
           marginBottom: 24,
         }}
       >
-        Ask your instructor or host for the access code.
+        Ask your facilitator for the room code, or open the join link they shared.
       </p>
       <input
         autoFocus
@@ -781,472 +740,6 @@ function HeatCodeScreen({
         <BackButton onClick={onBack} />
         <GameButton size="lg" style={{ flex: 1 }} disabled={!value.trim()} onClick={onNext}>
           Continue
-        </GameButton>
-      </div>
-    </GlassCard>
-  );
-}
-
-/** Host path: big code, copy, QR, waiting for players. */
-function HostShareScreen({
-  accessCode,
-  heatId,
-  creating,
-  error,
-  onCreate,
-  onEnter,
-  onBack,
-}: {
-  accessCode: string | null;
-  heatId: string | null;
-  creating: boolean;
-  error: string | null;
-  onCreate: () => void;
-  onEnter: () => void;
-  onBack: () => void;
-}) {
-  const [copied, setCopied] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
-  const [origin, setOrigin] = useState("");
-  /** Guard Strict Mode double-mount so we only POST one heat. */
-  const createOnceRef = useRef(false);
-
-  useEffect(() => {
-    const id = window.requestAnimationFrame(() => {
-      setOrigin(window.location.origin);
-    });
-    return () => window.cancelAnimationFrame(id);
-  }, []);
-
-  useEffect(() => {
-    if (accessCode || creating || createOnceRef.current) return;
-    createOnceRef.current = true;
-    onCreate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- create once on mount
-  }, [accessCode, creating]);
-
-  const joinUrl =
-    accessCode && origin
-      ? `${origin}/?code=${encodeURIComponent(accessCode)}`
-      : accessCode
-        ? `code=${accessCode}`
-        : "";
-
-  const qrSrc =
-    accessCode &&
-    `https://api.qrserver.com/v1/create-qr-code/?size=168x168&margin=8&data=${encodeURIComponent(
-      joinUrl || accessCode,
-    )}`;
-
-  const copyCode = async () => {
-    if (!accessCode) return;
-    try {
-      await navigator.clipboard.writeText(accessCode);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const copyLink = async () => {
-    if (!joinUrl) return;
-    try {
-      await navigator.clipboard.writeText(joinUrl);
-      setLinkCopied(true);
-      window.setTimeout(() => setLinkCopied(false), 2000);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  return (
-    <GlassCard className="p-4 text-center">
-      <h2
-        style={{
-          fontFamily: FO,
-          fontWeight: 700,
-          fontSize: 24,
-          color: "var(--sv-ink)",
-          marginBottom: 8,
-        }}
-      >
-        Share your heat
-      </h2>
-      <p
-        style={{
-          fontFamily: FO,
-          fontSize: 14,
-          color: "var(--sv-text-secondary)",
-          marginBottom: 16,
-          lineHeight: 1.45,
-        }}
-      >
-        Project this screen. Up to 4 players can join, including you.
-      </p>
-
-      {USE_MOCK && (
-        <p
-          style={{
-            fontFamily: FO,
-            fontSize: 12,
-            fontWeight: 600,
-            color: "var(--sv-warning, #b45309)",
-            background: "rgba(245, 158, 11, 0.12)",
-            border: "1px solid rgba(245, 158, 11, 0.35)",
-            borderRadius: 10,
-            padding: "10px 12px",
-            marginBottom: 16,
-            textAlign: "left",
-            lineHeight: 1.4,
-          }}
-        >
-          Mock mode: this code only works in <strong>this browser</strong>. For classmates
-          on other devices, set{" "}
-          <code style={{ fontSize: 11 }}>NEXT_PUBLIC_USE_MOCK=false</code> and restart.
-        </p>
-      )}
-
-      {creating && !accessCode && (
-        <div className="flex justify-center mb-6">
-          <div className="w-10 h-10 border-4 border-t-[var(--sv-teal-mid)] border-b-[var(--sv-teal-mid)] border-l-transparent border-r-transparent rounded-full animate-spin" />
-        </div>
-      )}
-
-      {accessCode && (
-        <>
-          <div
-            style={{
-              fontFamily: FO,
-              fontWeight: 800,
-              fontSize: "clamp(2rem, 8vw, 2.75rem)",
-              letterSpacing: "0.2em",
-              color: "var(--sv-teal-mid)",
-              padding: "24px 16px",
-              borderRadius: 16,
-              border: "2px solid var(--sv-teal-mid)",
-              background: "var(--sv-cyan-tint)",
-              marginBottom: 12,
-              userSelect: "all",
-              lineHeight: 1.1,
-            }}
-            aria-label={`Heat code ${accessCode}`}
-          >
-            {accessCode}
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-2 mb-5">
-            <GameButton size="md" style={{ flex: 1 }} onClick={() => void copyCode()}>
-              {copied ? "Copied!" : "Copy code"}
-            </GameButton>
-            <GameButton
-              size="md"
-              variant="secondary"
-              style={{ flex: 1 }}
-              onClick={() => void copyLink()}
-              disabled={!joinUrl}
-            >
-              {linkCopied ? "Link copied!" : "Copy join link"}
-            </GameButton>
-          </div>
-
-          {qrSrc && (
-            <div
-              className="mx-auto mb-4 p-3 rounded-2xl inline-block"
-              style={{
-                border: "1.5px solid var(--sv-border)",
-                background: "white",
-              }}
-            >
-              {/* External QR image — classroom share; no new npm dep */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={qrSrc}
-                alt={`QR code for heat ${accessCode}`}
-                width={168}
-                height={168}
-                style={{ display: "block", imageRendering: "pixelated" }}
-              />
-              <p
-                style={{
-                  fontFamily: FO,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: "var(--sv-text-muted)",
-                  marginTop: 8,
-                  marginBottom: 0,
-                }}
-              >
-                Scan to open join link
-              </p>
-            </div>
-          )}
-
-          <div
-            className="mb-5 p-3 rounded-xl text-left"
-            style={{
-              border: "1.5px dashed var(--sv-border)",
-              background: "rgba(255,255,255,0.55)",
-            }}
-          >
-            <p
-              style={{
-                fontFamily: FO,
-                fontSize: 12,
-                fontWeight: 700,
-                color: "var(--sv-teal-mid)",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                margin: "0 0 6px",
-              }}
-            >
-              Waiting for players
-            </p>
-            <p
-              style={{
-                fontFamily: FO,
-                fontSize: 13,
-                color: "var(--sv-text-secondary)",
-                margin: 0,
-                lineHeight: 1.45,
-              }}
-            >
-              Classmates open the home screen → Join a Heat → enter this code (or scan the
-              QR). When the room is ready, enter and play.
-            </p>
-          </div>
-        </>
-      )}
-
-      {error && (
-        <p
-          style={{
-            fontFamily: FO,
-            fontSize: 14,
-            color: "var(--sv-negative)",
-            marginBottom: 16,
-          }}
-        >
-          {error}
-        </p>
-      )}
-
-      <div className="flex flex-col gap-2">
-        <GameButton
-          size="lg"
-          style={{ width: "100%" }}
-          disabled={!heatId || creating}
-          onClick={onEnter}
-        >
-          Enter heat & play
-        </GameButton>
-        {error && (
-          <GameButton size="md" variant="ghost" style={{ width: "100%" }} onClick={onCreate}>
-            Try create again
-          </GameButton>
-        )}
-        <button
-          type="button"
-          onClick={onBack}
-          style={{
-            fontFamily: FO,
-            fontSize: 13,
-            color: "var(--sv-text-muted)",
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            textDecoration: "underline",
-            padding: 8,
-          }}
-        >
-          Back
-        </button>
-      </div>
-    </GlassCard>
-  );
-}
-
-function OfficialScreen({
-  isOfficial,
-  identity,
-  onOfficialChange,
-  onIdentityChange,
-  onNext,
-  onBack,
-}: {
-  isOfficial: boolean;
-  identity: string;
-  onOfficialChange: (v: boolean) => void;
-  onIdentityChange: (v: string) => void;
-  onNext: () => void;
-  onBack: () => void;
-}) {
-  const [ackOfficial, setAckOfficial] = useState(false);
-  const emailOk = !isOfficial || identity.trim().includes("@");
-  const canContinue = emailOk && (!isOfficial || ackOfficial);
-
-  const pickPractice = () => {
-    setAckOfficial(false);
-    onOfficialChange(false);
-  };
-  const pickOfficial = () => onOfficialChange(true);
-
-  return (
-    <GlassCard className="p-4">
-      <h2
-        style={{
-          fontFamily: FO,
-          fontWeight: 700,
-          fontSize: 24,
-          color: "var(--sv-ink)",
-          marginBottom: 8,
-        }}
-      >
-        Official or practice?
-      </h2>
-      <p
-        style={{
-          fontFamily: FO,
-          fontSize: 14,
-          color: "var(--sv-text-secondary)",
-          marginBottom: 20,
-          lineHeight: 1.45,
-        }}
-      >
-        Official attempts count once per person for the event. Practice does not lock you
-        out.
-      </p>
-
-      <div className="flex flex-col gap-3 mb-6">
-        <SelectionCard active={!isOfficial} onClick={pickPractice}>
-          <div className="text-left">
-            <div style={{ fontFamily: FO, fontWeight: 600, fontSize: 15 }}>Practice</div>
-            <div
-              style={{
-                fontFamily: FO,
-                fontSize: 12,
-                color: "var(--sv-text-muted)",
-                marginTop: 2,
-              }}
-            >
-              Unlimited retries. Not ranked as official.
-            </div>
-          </div>
-        </SelectionCard>
-        <SelectionCard active={isOfficial} onClick={pickOfficial}>
-          <div className="text-left">
-            <div style={{ fontFamily: FO, fontWeight: 600, fontSize: 15 }}>
-              Official attempt
-            </div>
-            <div
-              style={{
-                fontFamily: FO,
-                fontSize: 12,
-                color: "var(--sv-text-muted)",
-                marginTop: 2,
-              }}
-            >
-              One per email for this heat. Cannot be undone.
-            </div>
-          </div>
-        </SelectionCard>
-      </div>
-
-      {isOfficial && (
-        <>
-          <div
-            role="alert"
-            className="mb-4 p-3 rounded-xl text-left"
-            style={{
-              border: "1.5px solid var(--sv-warning)",
-              background: "rgba(180, 83, 9, 0.08)",
-            }}
-          >
-            <p
-              style={{
-                fontFamily: FO,
-                fontSize: 13,
-                fontWeight: 700,
-                color: "var(--sv-warning)",
-                margin: "0 0 6px",
-              }}
-            >
-              This cannot be undone
-            </p>
-            <p
-              style={{
-                fontFamily: FO,
-                fontSize: 13,
-                color: "var(--sv-text-secondary)",
-                margin: 0,
-                lineHeight: 1.45,
-              }}
-            >
-              Starting an official attempt locks this email for the heat. You will not get a
-              second official try if you mis-order or refresh mid-game.
-            </p>
-          </div>
-
-          <label
-            htmlFor="player-identity"
-            style={{
-              display: "block",
-              fontFamily: FO,
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              color: "var(--sv-teal-mid)",
-              marginBottom: 8,
-            }}
-          >
-            Email (locks one attempt)
-          </label>
-          <input
-            id="player-identity"
-            type="email"
-            autoComplete="email"
-            value={identity}
-            onChange={(e) => onIdentityChange(e.target.value)}
-            placeholder="you@school.edu"
-            style={{
-              width: "100%",
-              fontFamily: FO,
-              fontSize: 16,
-              padding: "14px 16px",
-              borderRadius: 12,
-              border: "2px solid var(--sv-border)",
-              background: "rgba(255,255,255,0.8)",
-              color: "var(--sv-ink)",
-              marginBottom: 14,
-              outline: "none",
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && canContinue) onNext();
-            }}
-          />
-
-          <label
-            className="flex items-start gap-2.5 mb-5 cursor-pointer text-left"
-            style={{ fontFamily: FO }}
-          >
-            <input
-              type="checkbox"
-              checked={ackOfficial}
-              onChange={(e) => setAckOfficial(e.target.checked)}
-              style={{ marginTop: 3, accentColor: "var(--sv-teal-mid)" }}
-            />
-            <span style={{ fontSize: 13, color: "var(--sv-ink)", lineHeight: 1.4 }}>
-              I understand this is my only official attempt for this heat with this email.
-            </span>
-          </label>
-        </>
-      )}
-
-      <div className="flex gap-2">
-        <BackButton onClick={onBack} />
-        <GameButton size="lg" style={{ flex: 1 }} disabled={!canContinue} onClick={onNext}>
-          {isOfficial ? "Lock in & continue" : "Continue"}
         </GameButton>
       </div>
     </GlassCard>
@@ -1332,22 +825,14 @@ function LoadingScreen({
 // Main flow
 // Welcome → Mode →
 //   solo: PracticeFast → [Tutorial?] → Loading
-//   host: Identity → HostShare → Official → [Tutorial?] → Loading
-//   heat: Identity → HeatCode → Official → [Tutorial?] → Loading
+//   heat: HeatCode → redirects to /join/[code]
 // ---------------------------------------------------------
 
 export default function OnboardingFlow() {
   const router = useRouter();
-  const { startSolo, joinHeat, createHostedHeat, submitting, error, reset } =
-    useAttemptStore();
+  const { startSolo, submitting, error, reset } = useAttemptStore();
   const [gameConfig, setGameConfig] = useState<GameConfig>(DEFAULT_CONFIG);
   const [hoverPersona, setHoverPersona] = useState<PersonaSlug | null>(null);
-  const [hostedHeat, setHostedHeat] = useState<{
-    heat_id: string;
-    access_code: string;
-  } | null>(null);
-  const [hostCreating, setHostCreating] = useState(false);
-  const [hostError, setHostError] = useState<string | null>(null);
   /**
    * Focused-element warehouse tour (dark overlay + spotlights).
    * Same PlayTour as in-game How to play — runs once during onboarding.
@@ -1386,33 +871,24 @@ export default function OnboardingFlow() {
     };
   }, []);
 
-  // Empty defaults for SSR/hydrate parity; hydrate from storage + ?code= after mount.
+  // Empty defaults for SSR/hydrate parity; hydrate from storage after mount.
   const [data, setData] = useState({
     persona: "" as PersonaSlug | "",
     name: "",
     mode: "solo" as PlayMode,
     heatCode: "",
-    isOfficial: false,
-    playerIdentity: "",
   });
 
-  // welcome(0) → mode(1) → identity(2) when joining via QR/link
-  // Always start at 0 for SSR hydrate parity; jump after mount if ?code= present.
   const [stepIndex, setStepIndex] = useState(0);
 
   useEffect(() => {
     const id = window.requestAnimationFrame(() => {
       const profile = readPlayerProfile();
-      const code = readQueryHeatCode();
       setData((prev) => ({
         ...prev,
         persona: (profile.persona ?? prev.persona) as PersonaSlug | "",
         name: profile.name ?? prev.name,
-        mode: code ? "heat" : prev.mode,
-        heatCode: code || prev.heatCode,
-        playerIdentity: readSavedIdentity() || prev.playerIdentity,
       }));
-      if (code) setStepIndex(2);
     });
     return () => window.cancelAnimationFrame(id);
   }, []);
@@ -1452,19 +928,6 @@ export default function OnboardingFlow() {
   const next = () => setStepIndex((s) => s + 1);
   const back = () => setStepIndex((s) => Math.max(0, s - 1));
 
-  const handleCreateHostedHeat = async () => {
-    setHostCreating(true);
-    setHostError(null);
-    try {
-      const heat = await createHostedHeat(data.name.trim() || "Host");
-      setHostedHeat(heat);
-    } catch (e) {
-      setHostError(e instanceof Error ? e.message : "Could not create heat");
-    } finally {
-      setHostCreating(false);
-    }
-  };
-
   /** Ensure practice has a default persona without forcing the picker. */
   const ensurePracticeProfile = () => {
     const player = data.name.trim() || "Player";
@@ -1477,45 +940,16 @@ export default function OnboardingFlow() {
     return player;
   };
 
+  const goToJoinRoom = () => {
+    const code = data.heatCode.trim().toUpperCase();
+    if (!code) return;
+    router.push(`/join/${encodeURIComponent(code)}`);
+  };
+
   const runStart = async () => {
-    const player =
-      data.mode === "solo"
-        ? ensurePracticeProfile()
-        : data.name.trim() || "Player";
-    const profile = readPlayerProfile();
-    writePlayerProfile({
-      persona: data.persona || profile.persona || DEFAULT_PERSONA,
-      name: player,
-    });
+    const player = ensurePracticeProfile();
     try {
-      if (data.mode === "solo") {
-        const id = await startSolo(player);
-        router.push(`/play/${id}`);
-        return;
-      }
-      if (data.mode === "host") {
-        const key =
-          hostedHeat?.access_code ||
-          hostedHeat?.heat_id ||
-          useAttemptStore.getState().heatAccessCode;
-        if (!key) {
-          throw new Error("Heat not ready — go back and create a code");
-        }
-        const id = await joinHeat(key, player, {
-          is_official: data.isOfficial,
-          player_identity: data.playerIdentity.trim(),
-        });
-        router.push(`/play/${id}`);
-        return;
-      }
-      const code = data.heatCode.trim();
-      if (!code) {
-        throw new Error("Enter a heat code first.");
-      }
-      const id = await joinHeat(code, player, {
-        is_official: data.isOfficial,
-        player_identity: data.playerIdentity.trim(),
-      });
+      const id = await startSolo(player);
       router.push(`/play/${id}`);
     } catch (err) {
       console.error(err);
@@ -1561,100 +995,48 @@ export default function OnboardingFlow() {
           />
         ),
       });
-    } else {
+
+      if (showTutorial) {
+        screens.push({
+          id: "tutorial",
+          component: (
+            <OnboardingWarehouseTour
+              config={gameConfig}
+              onComplete={next}
+            />
+          ),
+        });
+      }
+
       screens.push({
-        id: "identity",
+        id: "loading",
         component: (
-          <IdentityScreen
-            persona={data.persona}
-            name={data.name}
-            onPersonaChange={(v) => updateData("persona", v)}
-            onNameChange={(v) => updateData("name", v)}
-            onNext={next}
-            onHoverPersona={setHoverPersona}
+          <LoadingScreen
+            submitting={submitting}
+            error={error}
+            onHome={() => {
+              reset();
+              setStepIndex(0);
+            }}
+            onRetry={() => void runStart()}
+            onStart={() => void runStart()}
           />
         ),
       });
-
-      if (data.mode === "heat") {
-        screens.push({
-          id: "heatCode",
-          component: (
-            <HeatCodeScreen
-              value={data.heatCode}
-              onChange={(v) => updateData("heatCode", v)}
-              onNext={next}
-              onBack={back}
-            />
-          ),
-        });
-      }
-
-      if (data.mode === "host") {
-        screens.push({
-          id: "hostShare",
-          component: (
-            <HostShareScreen
-              accessCode={hostedHeat?.access_code ?? null}
-              heatId={hostedHeat?.heat_id ?? null}
-              creating={hostCreating || submitting}
-              error={hostError || error}
-              onCreate={() => void handleCreateHostedHeat()}
-              onEnter={next}
-              onBack={() => {
-                setHostedHeat(null);
-                setHostError(null);
-                back();
-              }}
-            />
-          ),
-        });
-      }
-
+    } else {
+      // Join a room: enter code → dedicated /join/[code] page
       screens.push({
-        id: "official",
+        id: "heatCode",
         component: (
-          <OfficialScreen
-            isOfficial={data.isOfficial}
-            identity={data.playerIdentity}
-            onOfficialChange={(v) => updateData("isOfficial", v)}
-            onIdentityChange={(v) => updateData("playerIdentity", v)}
-            onNext={goToPlayOrTutorial}
+          <HeatCodeScreen
+            value={data.heatCode}
+            onChange={(v) => updateData("heatCode", v)}
+            onNext={goToJoinRoom}
             onBack={back}
           />
         ),
       });
     }
-
-    if (showTutorial) {
-      screens.push({
-        id: "tutorial",
-        component: (
-          <OnboardingWarehouseTour
-            config={gameConfig}
-            onComplete={next}
-          />
-        ),
-      });
-    }
-
-    screens.push({
-      id: "loading",
-      component: (
-        <LoadingScreen
-          submitting={submitting}
-          error={error}
-          onHome={() => {
-            reset();
-            setHostedHeat(null);
-            setHostError(null);
-            setStepIndex(0);
-          }}
-          onRetry={() => void runStart()}
-          onStart={() => void runStart()}
-        />
-      ),
-    });
 
     return screens;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuild when flow inputs change
@@ -1664,11 +1046,6 @@ export default function OnboardingFlow() {
     data.name,
     data.persona,
     data.heatCode,
-    data.isOfficial,
-    data.playerIdentity,
-    hostedHeat,
-    hostCreating,
-    hostError,
     submitting,
     error,
     showTutorial,
@@ -1707,8 +1084,6 @@ export default function OnboardingFlow() {
   // Screens that already have their own Back control
   const hasInlineBack =
     stepId === "heatCode" ||
-    stepId === "hostShare" ||
-    stepId === "official" ||
     stepId === "practiceFast" ||
     stepId === "tutorial";
 

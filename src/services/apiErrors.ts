@@ -26,14 +26,16 @@ export function parseApiFailure(err: unknown): { message: string; code?: string 
 function friendlyMessage(code: string | undefined, fallback: string): string {
   switch (code) {
     case "HEAT_FULL":
-      return "This heat is full. Ask the host to create a new heat, or join a different code.";
+      return "This room is full. Ask the facilitator for a new room, or join a different code.";
     case "ALREADY_ATTEMPTED":
-      return "You already used your official attempt for this heat. Use Solo practice, or join with a different identity.";
+      return "You already used your official attempt for this room. Use Solo practice, or join with a different identity.";
     case "HEAT_NOT_FOUND":
       return (
         fallback ||
-        "Heat not found. Check the code (no typos). Mock mode only works in the same browser — use NEXT_PUBLIC_USE_MOCK=false for real multiplayer."
+        "Room not found. Check the code (no typos). Mock mode only works in this same browser — use NEXT_PUBLIC_USE_MOCK=false for real multiplayer."
       );
+    case "BAD_REQUEST":
+      return fallback || "Invalid request. Check your details and try again.";
     case "ATTEMPT_NOT_FOUND":
       return "That game session was not found. Start a new one from the home screen.";
     case "ATTEMPT_COMPLETED":

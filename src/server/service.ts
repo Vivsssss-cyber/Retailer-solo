@@ -300,13 +300,23 @@ export async function createAttempt(
       );
     }
 
-    // Soft identity lock only when client supplies one (optional).
-    // Room gate is access_code + QR — not email OTP.
-    const identity = body.player_identity?.trim() || null;
+    // Room gate is access_code + QR. Official one-attempt lock needs an identity.
     const isOfficial = body.is_official === true;
-    if (isOfficial && identity) {
+    let identity = body.player_identity?.trim() || null;
+    if (isOfficial) {
+      if (!identity) {
+        throw new ApiError(
+          "BAD_REQUEST",
+          "Official attempts require an email or player ID",
+          400,
+        );
+      }
+      // Canonicalize email-like identities for lock comparison
+      identity = identity.toLowerCase();
       const dup = active.find(
-        (a) => a.is_official && a.player_identity === identity,
+        (a) =>
+          a.is_official &&
+          a.player_identity?.toLowerCase() === identity,
       );
       if (dup) {
         throw new ApiError(
