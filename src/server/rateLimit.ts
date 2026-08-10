@@ -37,34 +37,6 @@ export function assertRateLimit(opts: RateLimitOptions): void {
   bucket.timestamps.push(now);
 }
 
-/**
- * Non-throwing rate check (returns retry-after when limited).
- * Prefer `assertRateLimit` for route handlers.
- */
-export function checkRateLimit(
-  key: string,
-  limit: number,
-  windowMs: number,
-): { ok: true } | { ok: false; retryAfterSec: number } {
-  const now = Date.now();
-  const windowStart = now - windowMs;
-  let bucket = buckets.get(key);
-  if (!bucket) {
-    bucket = { timestamps: [] };
-    buckets.set(key, bucket);
-  }
-  bucket.timestamps = bucket.timestamps.filter((t) => t > windowStart);
-  if (bucket.timestamps.length >= limit) {
-    const oldest = bucket.timestamps[0] ?? now;
-    return {
-      ok: false,
-      retryAfterSec: Math.max(1, Math.ceil((oldest + windowMs - now) / 1000)),
-    };
-  }
-  bucket.timestamps.push(now);
-  return { ok: true };
-}
-
 export function clientIpFromRequest(request: Request): string {
   const xf = request.headers.get("x-forwarded-for");
   if (xf) {
@@ -76,15 +48,7 @@ export function clientIpFromRequest(request: Request): string {
   return "unknown";
 }
 
-/** @deprecated alias — use clientIpFromRequest */
-export const clientIp = clientIpFromRequest;
-
 /** Test helper */
 export function __resetRateLimitsForTests(): void {
-  buckets.clear();
-}
-
-/** Test helper (HEAD name) */
-export function resetRateLimitsForTests(): void {
   buckets.clear();
 }

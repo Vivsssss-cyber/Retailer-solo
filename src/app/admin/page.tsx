@@ -55,11 +55,18 @@ export default function AdminOverviewPage() {
       title="Admin overview"
       subtitle="Control game stats and numbers for The Retailer Challenge (solo-beergame creator parity)."
       actions={
-        <Link href="/admin/game">
-          <GameButton type="button" size="sm">
-            Edit game numbers
-          </GameButton>
-        </Link>
+        <>
+          <Link href="/admin/rooms">
+            <GameButton type="button" size="sm">
+              Create room
+            </GameButton>
+          </Link>
+          <Link href="/admin/game">
+            <GameButton type="button" size="sm" variant="secondary">
+              Edit game numbers
+            </GameButton>
+          </Link>
+        </>
       }
     >
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">

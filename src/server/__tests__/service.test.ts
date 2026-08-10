@@ -113,6 +113,31 @@ describe("heat + attempt lifecycle", () => {
     ).rejects.toMatchObject({ code: "ALREADY_ATTEMPTED" });
   });
 
+  it("allows official attempt without identity (QR/access-code join)", async () => {
+    const heat = await createHeat({ solo: false });
+    const { attempt } = await createAttempt(heat.heat_id, {
+      player_name: "Ava",
+      is_official: true,
+    });
+    expect(attempt.player_name).toBe("Ava");
+  });
+
+  it("canonicalizes official identity case", async () => {
+    const heat = await createHeat({ solo: false });
+    await createAttempt(heat.heat_id, {
+      player_name: "Ava",
+      player_identity: "Ava@Example.com",
+      is_official: true,
+    });
+    await expect(
+      createAttempt(heat.heat_id, {
+        player_name: "Ava 2",
+        player_identity: "ava@example.com",
+        is_official: true,
+      }),
+    ).rejects.toMatchObject({ code: "ALREADY_ATTEMPTED" });
+  });
+
   it("allows practice retries without identity lock", async () => {
     const heat = await createHeat({ solo: false });
     await createAttempt(heat.heat_id, {

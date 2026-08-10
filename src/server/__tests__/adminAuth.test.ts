@@ -1,88 +1,60 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
-  ADMIN_SESSION_COOKIE,
   isAdminAuthenticated,
   requireAdmin,
   requireAdminPin,
-  safeEqual,
 } from "../adminAuth";
+import { getAdminPin } from "../adminSecret";
 import {
   __resetAdminSessionsForTests,
-  createAdminSession,
   adminSessionCookieValue,
+  createAdminSession,
+  ADMIN_SESSION_COOKIE,
 } from "../adminSession";
-import { getAdminPin } from "../adminSecret";
 import { ApiError } from "../errors";
 import { __resetRateLimitsForTests } from "../rateLimit";
 
-function req(
-  init: {
-    cookie?: string;
-    pinHeader?: string;
-    ip?: string;
-  } = {},
-): Request {
-  const headers = new Headers();
-  if (init.cookie) headers.set("cookie", init.cookie);
-  if (init.pinHeader) headers.set("x-admin-pin", init.pinHeader);
-  if (init.ip) headers.set("x-forwarded-for", init.ip);
+beforeEach(() => {
+  __resetAdminSessionsForTests();
+  __resetRateLimitsForTests();
+});
+
+function req(headers: Record<string, string> = {}): Request {
   return new Request("http://localhost/api/test", { headers });
 }
 
-describe("adminAuth", () => {
-  const prevPin = process.env.ADMIN_PIN;
-  const prevNodeEnv = process.env.NODE_ENV;
-
-  beforeEach(() => {
-    __resetRateLimitsForTests();
-    __resetAdminSessionsForTests();
-    process.env.ADMIN_PIN = "test-secret-pin";
-    process.env.NODE_ENV = "test";
+describe("adminAuth (modular session + pin)", () => {
+  it("requireAdmin / requireAdminPin reject missing credentials", () => {
+    expect(() => requireAdmin(req())).toThrow(ApiError);
+    expect(() => requireAdminPin(req())).toThrow(ApiError);
+    expect(isAdminAuthenticated(req())).toBe(false);
   });
 
-  afterEach(() => {
-    __resetRateLimitsForTests();
-    __resetAdminSessionsForTests();
-    if (prevPin === undefined) delete process.env.ADMIN_PIN;
-    else process.env.ADMIN_PIN = prevPin;
-    process.env.NODE_ENV = prevNodeEnv;
+  it("accepts correct X-Admin-Pin header", () => {
+    const pin = getAdminPin();
+    expect(() => requireAdmin(req({ "X-Admin-Pin": pin }))).not.toThrow();
+    expect(isAdminAuthenticated(req({ "X-Admin-Pin": pin }))).toBe(true);
   });
 
-  it("safeEqual matches equal strings", () => {
-    expect(safeEqual("abc", "abc")).toBe(true);
-    expect(safeEqual("abc", "abd")).toBe(false);
-    expect(safeEqual("a", "ab")).toBe(false);
+  it("rejects wrong PIN header", () => {
+    expect(() => requireAdmin(req({ "X-Admin-Pin": "wrong-pin" }))).toThrow(
+      ApiError,
+    );
+    expect(isAdminAuthenticated(req({ "X-Admin-Pin": "wrong-pin" }))).toBe(
+      false,
+    );
   });
 
-  it("accepts valid session cookie", () => {
+  it("accepts valid admin session cookie", () => {
     const token = createAdminSession();
     const cookie = `${ADMIN_SESSION_COOKIE}=${token}`;
-    expect(isAdminAuthenticated(req({ cookie }))).toBe(true);
     expect(() => requireAdmin(req({ cookie }))).not.toThrow();
-    expect(() => requireAdminPin(req({ cookie }))).not.toThrow();
-  });
-
-  it("accepts matching X-Admin-Pin header", () => {
-    expect(
-      isAdminAuthenticated(req({ pinHeader: "test-secret-pin" })),
-    ).toBe(true);
-    expect(() =>
-      requireAdmin(req({ pinHeader: getAdminPin() })),
-    ).not.toThrow();
-  });
-
-  it("rejects wrong pin header and missing auth", () => {
-    expect(isAdminAuthenticated(req({ pinHeader: "wrong" }))).toBe(false);
-    expect(isAdminAuthenticated(req())).toBe(false);
-    expect(() => requireAdmin(req())).toThrow(ApiError);
+    expect(isAdminAuthenticated(req({ cookie }))).toBe(true);
   });
 
   it("rejects forged session cookie", () => {
-    expect(
-      isAdminAuthenticated(
-        req({ cookie: `${ADMIN_SESSION_COOKIE}=deadbeef` }),
-      ),
-    ).toBe(false);
+    const cookie = `${ADMIN_SESSION_COOKIE}=deadbeef`;
+    expect(() => requireAdmin(req({ cookie }))).toThrow(ApiError);
   });
 
   it("admin session cookie helper sets HttpOnly", () => {

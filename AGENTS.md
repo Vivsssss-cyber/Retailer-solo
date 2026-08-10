@@ -56,9 +56,11 @@ public/
 
 | Path | Purpose |
 |---|---|
-| `/` | Intro, name, solo start / join heat code |
+| `/` | Intro, solo practice / join room code |
+| `/join/[code]` | Player join via shared room link |
 | `/play/[attemptId]` | Active game + report |
 | `/admin` | Admin: game numbers, demand/supply, sessions (server `ADMIN_PIN` env) |
+| `/admin/rooms` | Create/share rooms (admin-only multiplayer create) |
 | `/admin/game` | Edit rounds, costs, starting state, coaching panels |
 | `/admin/sequences` | Per-round demand & supply rate editors |
 | `/admin/data` | Local heats/attempts + clear mock data |
@@ -109,7 +111,7 @@ Copy `.env.example` → `.env.local`:
 |---|---|
 | `NEXT_PUBLIC_USE_MOCK` | default mock on; `"false"` for live API |
 | `NEXT_PUBLIC_API_URL` | backend base URL |
-| `ADMIN_PIN` | server-only admin secret (live admin + API; required in production) |
+| `ADMIN_PIN` | server-only admin secret (live admin + API) |
 | `DATA_DIR` | file store path for live single-node |
 
 ---
@@ -140,21 +142,22 @@ Copy `.env.example` → `.env.local`:
 
 ### Known frontend gaps
 
-- ~~Create-heat + show access code UX~~ (done: Host a Heat mode + code share + header badge)  
+- ~~Create-heat + show access code UX~~ (done: admin Rooms create + share)  
+- ~~Admin room + join link~~ (done: `/admin/rooms`, `/join/[code]`, multiplayer create PIN-gated; public Host removed)  
 - ~~Live board polling during play~~ (done: 4s poll while status=playing)  
-- ~~Official one-attempt UX~~ (done: practice vs official + email lock + friendly errors)  
+- ~~Official one-attempt UX~~ (done: server requires identity when official; join path is practice-only)  
 - ~~True single-screen no-scroll densify~~ (done: 100dvh play shell + dense KPIs/charts)  
 - ~~Progressive density~~ (done: rounds 1–2 simplified + stronger coach; 3+ charts/history)  
-- ~~Onboarding fast path~~ (done: practice = avatar + name → start; heat/host full wizard)  
+- ~~Onboarding fast path~~ (done: practice = avatar + name → start; join → `/join/[code]`)  
 - ~~First-run interactive tutorial~~ (done: sample order → delay → costs; skippable once)  
-- ~~Official irreversible confirm~~ (done: warning + checkbox before lock-in)  
-- ~~Host classroom share~~ (done: large code, copy, QR, join link `?code=`, waiting copy)  
+- ~~Official irreversible confirm~~ (done for store path; join page is practice-only Phase 1)  
+- Admin room roster (names) — Phase 2 (count only today)  
+- Real admin auth (env session) — Phase 3 (demo PIN still client-visible)  
 
 ### Known backend gaps (B5–B6)
 
 - ~~Strong identity / OTP~~ (classroom uses access code + QR; optional soft identity lock — no email OTP by design)  
 - ~~Rate limits~~ (in-memory single-node; Redis if multi-instance)  
-
 - Postgres (or other multi-instance) store  
 - Staging E2E mock-off sign-off  
 - ~~Admin config → server~~ (done: PUT config + admin editor dual-write)  
@@ -198,13 +201,11 @@ Copy `.env.example` → `.env.local`:
 - `/admin` section (solo-beergame creator parity for game stats/numbers)  
 - Active config in `localStorage` (`retailer-challenge-admin-config-v1`); mock heats snapshot it  
 - Admin auth: server-only `ADMIN_PIN` env → `POST /admin/login` sets httpOnly cookie; never ship PIN in client JS  
-- Mock offline unlock: any non-empty PIN (UI sessionStorage only; not used by live client)  
 - Admin save: mock → localStorage; live → cookie session (or `X-Admin-Pin` for scripts) on `PUT /configurations/:id`  
 - Player ownership: `player_token` on createAttempt; client sends `X-Player-Token` for attempt read/mutate  
 - Classroom join: heat **access code + QR / `?code=`** (no email OTP); multiplayer codes are 8 chars  
 - Rate limits (in-memory, single-node): admin login, create heat/attempt, submit round  
 - Security headers: frame deny, nosniff, referrer, permissions, HSTS  
-
 - New live heats snapshot the **server** active config after admin save  
 
 ---

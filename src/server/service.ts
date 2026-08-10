@@ -300,13 +300,19 @@ export async function createAttempt(
       );
     }
 
-    // Soft identity lock only when client supplies one (optional).
     // Room gate is access_code + QR — not email OTP.
-    const identity = body.player_identity?.trim() || null;
+    // Soft identity lock only when client supplies one (optional).
     const isOfficial = body.is_official === true;
+    let identity = body.player_identity?.trim() || null;
+    if (identity) {
+      // Canonicalize email-like identities for lock comparison
+      identity = identity.toLowerCase();
+    }
     if (isOfficial && identity) {
       const dup = active.find(
-        (a) => a.is_official && a.player_identity === identity,
+        (a) =>
+          a.is_official &&
+          a.player_identity?.toLowerCase() === identity,
       );
       if (dup) {
         throw new ApiError(

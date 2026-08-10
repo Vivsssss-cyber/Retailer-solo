@@ -8,7 +8,6 @@ import { ApiRequestError } from "./apiErrors";
 /**
  * Live REST client — used when NEXT_PUBLIC_USE_MOCK is "false".
  * With empty NEXT_PUBLIC_API_URL, calls same-origin Next.js API routes.
- * Admin writes use the HttpOnly session cookie (credentials: include).
  */
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== "false";
 
@@ -72,8 +71,19 @@ const liveApi: RetailerChallengeApi = {
       body: JSON.stringify(config),
       // Cookie session after adminLogin — no PIN in client bundle
     }),
+  /** Public solo create — never send multiplayer without adminCreateRoom. */
   createHeat: (body) =>
-    request(`/heats`, { method: "POST", body: JSON.stringify(body) }),
+    request(`/heats`, {
+      method: "POST",
+      body: JSON.stringify({ ...body, solo: body.solo === true }),
+    }),
+  /** Multiplayer room: requires admin session cookie (credentials: include). */
+  adminCreateRoom: (body = {}) =>
+    request(`/heats`, {
+      method: "POST",
+      body: JSON.stringify({ ...body, solo: false }),
+    }),
+  getHeat: (heatIdOrCode) => request(heatPath(heatIdOrCode, "")),
   createAttempt: async (heatId, body) => {
     const result = await request<CreateAttemptResponse>(attemptPath(heatId), {
       method: "POST",
@@ -119,7 +129,6 @@ const liveApi: RetailerChallengeApi = {
       method: "POST",
       body: JSON.stringify({}),
     }),
-  getAdminSession: () => request(`/admin/session`),
   getAdminData: () => request(`/admin/data`),
   clearAdminData: () =>
     request(`/admin/clear`, {

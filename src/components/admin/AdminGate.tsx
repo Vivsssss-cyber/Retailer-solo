@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { FO, GameButton, GridBackground, PageTransition, cardStyle } from "@/components/cyan";
 import {
   isAdminUnlocked,
@@ -21,43 +21,12 @@ export function AdminGate({ children }: { children: ReactNode }) {
     () => false,
   );
   const [localUnlocked, setLocalUnlocked] = useState(false);
-  const [checking, setChecking] = useState(!USE_MOCK);
   const unlocked = sessionUnlocked || localUnlocked;
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Live: confirm httpOnly session cookie still valid after refresh.
-  useEffect(() => {
-    if (USE_MOCK) {
-      setChecking(false);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const session = await api.getAdminSession();
-        if (cancelled) return;
-        if (session.authenticated) {
-          markAdminUnlocked();
-          setLocalUnlocked(true);
-        } else {
-          lockAdmin();
-          setLocalUnlocked(false);
-        }
-      } catch {
-        // Fall back to sessionStorage flag if session probe fails.
-        if (!cancelled && isAdminUnlocked()) setLocalUnlocked(true);
-      } finally {
-        if (!cancelled) setChecking(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const tryUnlock = useCallback(async () => {
+  async function tryUnlock() {
     setError(null);
     setBusy(true);
     try {
@@ -72,35 +41,12 @@ export function AdminGate({ children }: { children: ReactNode }) {
       await api.adminLogin(pin);
       markAdminUnlocked();
       setLocalUnlocked(true);
-      setPin("");
     } catch (e) {
       const { message } = parseApiFailure(e);
       setError(message || "Incorrect PIN");
     } finally {
       setBusy(false);
     }
-  }, [pin]);
-
-  if (checking) {
-    return (
-      <GridBackground>
-        <PageTransition>
-          <main className="max-w-md mx-auto px-4 py-16">
-            <div style={{ ...cardStyle, padding: 28 }}>
-              <p
-                style={{
-                  fontFamily: FO,
-                  fontSize: 13,
-                  color: "var(--sv-text-secondary)",
-                }}
-              >
-                Checking admin session…
-              </p>
-            </div>
-          </main>
-        </PageTransition>
-      </GridBackground>
-    );
   }
 
   if (!unlocked) {
@@ -136,13 +82,12 @@ export function AdminGate({ children }: { children: ReactNode }) {
               <input
                 type="password"
                 value={pin}
-                autoComplete="current-password"
-                disabled={busy}
                 onChange={(e) => setPin(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !busy) void tryUnlock();
                 }}
                 placeholder="Admin PIN"
+                autoComplete="current-password"
                 style={{
                   fontFamily: FO,
                   width: "100%",
@@ -155,21 +100,14 @@ export function AdminGate({ children }: { children: ReactNode }) {
                 }}
               />
               {error && (
-                <p
-                  style={{
-                    fontFamily: FO,
-                    fontSize: 12,
-                    color: "var(--sv-negative)",
-                    marginBottom: 12,
-                  }}
-                >
+                <p style={{ fontFamily: FO, fontSize: 12, color: "var(--sv-negative)", marginBottom: 12 }}>
                   {error}
                 </p>
               )}
               <GameButton
                 type="button"
                 style={{ width: "100%" }}
-                disabled={busy || !pin.trim()}
+                disabled={busy}
                 onClick={() => void tryUnlock()}
               >
                 {busy ? "Checking…" : "Unlock admin"}

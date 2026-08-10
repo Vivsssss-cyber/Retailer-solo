@@ -38,15 +38,15 @@ import { hasCompletedPlayTour } from "@/lib/playTour";
 
 const COACH_LINES: Record<string, string> = {
   welcome: "I'm your coach. Before we open the warehouse — let's get you set up.",
-  mode: "Join a group with the code from your instructor. Solo practice only if they enabled it.",
+  mode: "Solo practice is the fastest path. Join a room when your facilitator shares a code.",
   practiceFast: "Pick a face and a name — cosmetic only. Then we open the warehouse.",
   identity:
-    "Pick an avatar now. Add a display name if you want — you can keep it short or skip for later.",
-  heatCode: "Enter the group code from your host. Name comes next.",
+    "Avatar and name are cosmetic only — they never change scoring or fairness.",
+  heatCode: "Ask your facilitator for the room code. We'll take you to the join page.",
   official:
-    "Official is one attempt per email — permanent for this group. Practice is unlimited.",
+    "Official is one attempt per email — permanent for this heat. Practice is unlimited.",
   officialConfirm:
-    "Last chance. Official cannot be undone for this email on this group.",
+    "Last chance. Official cannot be undone for this email on this heat.",
   tutorial: "I'll spotlight the warehouse — inventory, history, charts, and your order dock.",
   loading: "Locking in your setup. Warehouse opens in a second…",
 };
@@ -64,40 +64,9 @@ const COACH_EXPRESSIONS_BY_STEP: Record<string, CoachExpression> = {
   loading: "thinking",
 };
 
-/** Players never host — classroom heats are admin-created. */
 type PlayMode = "solo" | "heat";
 
-const IDENTITY_KEY = "retailer-challenge-player-identity";
 const DEFAULT_PERSONA: PersonaSlug = "the-analyst";
-
-function readSavedIdentity(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    return sessionStorage.getItem(IDENTITY_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function saveIdentity(value: string) {
-  if (typeof window === "undefined") return;
-  try {
-    if (value) sessionStorage.setItem(IDENTITY_KEY, value);
-    else sessionStorage.removeItem(IDENTITY_KEY);
-  } catch {
-    /* ignore */
-  }
-}
-
-function readQueryHeatCode(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    const code = new URLSearchParams(window.location.search).get("code");
-    return code ? code.trim().toUpperCase() : "";
-  } catch {
-    return "";
-  }
-}
 
 // ---------------------------------------------------------
 // Helpers
@@ -270,12 +239,10 @@ function ModeScreen({
   value,
   onChange,
   onNext,
-  soloEnabled,
 }: {
   value: PlayMode;
   onChange: (v: PlayMode) => void;
   onNext: () => void;
-  soloEnabled: boolean;
 }) {
   const options: {
     id: PlayMode;
@@ -284,20 +251,18 @@ function ModeScreen({
     icon: React.ReactNode;
   }[] = [
     {
+      id: "solo",
+      title: "Solo Practice",
+      blurb: "Fastest path — name, coach walkthrough, play.",
+      icon: <Target size={20} color="currentColor" />,
+    },
+    {
       id: "heat",
-      title: "Join a Group",
-      blurb: "Enter a code from your host or instructor.",
+      title: "Join a Room",
+      blurb: "Enter a code from your facilitator (or open their join link).",
       icon: <Package size={20} color="currentColor" />,
     },
   ];
-  if (soloEnabled) {
-    options.push({
-      id: "solo",
-      title: "Solo Practice",
-      blurb: "Private practice — not ranked with a classroom group.",
-      icon: <Target size={20} color="currentColor" />,
-    });
-  }
 
   return (
     <GlassCard className="p-4">
@@ -535,7 +500,7 @@ function PracticeFastScreen({
   );
 }
 
-/** Avatar + optional name — after group code. Name can be blank (defaults on start). */
+/** Combined avatar + name — heat/host path only. */
 function IdentityScreen({
   persona,
   name,
@@ -543,7 +508,6 @@ function IdentityScreen({
   onNameChange,
   onNext,
   onHoverPersona,
-  onBack,
 }: {
   persona: PersonaSlug | "";
   name: string;
@@ -551,11 +515,9 @@ function IdentityScreen({
   onNameChange: (v: string) => void;
   onNext: () => void;
   onHoverPersona?: (slug: PersonaSlug | null) => void;
-  onBack?: () => void;
 }) {
   const selected = personaBySlug(persona);
-  // Name is optional — join the group first, fill display name whenever ready.
-  const canContinue = !!persona;
+  const canContinue = !!persona && name.trim().length > 0;
 
   return (
     <GlassCard className="p-4">
@@ -581,7 +543,7 @@ function IdentityScreen({
           lineHeight: 1.45,
         }}
       >
-        Choose an avatar. Display name is optional for now.
+        Avatar and name for the board only.
       </p>
       <p
         style={{
@@ -630,13 +592,13 @@ function IdentityScreen({
           marginBottom: 8,
         }}
       >
-        Display name (optional)
+        Display name
       </label>
       <input
         id="player-name"
         value={name}
         onChange={(e) => onNameChange(e.target.value)}
-        placeholder="Skip for now — e.g. Ava"
+        placeholder="e.g. Ava"
         maxLength={24}
         style={{
           width: "100%",
@@ -695,7 +657,7 @@ function IdentityScreen({
               }}
               className="truncate"
             >
-              {name.trim() || "Name optional"}
+              {name.trim() || "Add a display name"}
             </p>
             <p
               style={{
@@ -711,21 +673,12 @@ function IdentityScreen({
         </div>
       )}
 
-      <div className="flex gap-2">
-        {onBack && <BackButton onClick={onBack} />}
-        <GameButton
-          size="lg"
-          style={{ flex: 1 }}
-          disabled={!canContinue}
-          onClick={onNext}
-        >
-          {name.trim() ? "Continue" : "Continue without name"}
-        </GameButton>
-      </div>
+      <GameButton size="lg" style={{ width: "100%" }} disabled={!canContinue} onClick={onNext}>
+        Continue
+      </GameButton>
     </GlassCard>
   );
 }
-
 function HeatCodeScreen({
   value,
   onChange,
@@ -748,7 +701,7 @@ function HeatCodeScreen({
           marginBottom: 8,
         }}
       >
-        Enter group code
+        Enter Room Code
       </h2>
       <p
         style={{
@@ -758,7 +711,7 @@ function HeatCodeScreen({
           marginBottom: 24,
         }}
       >
-        Ask your instructor for the access code. You can add your name after you join.
+        Ask your facilitator for the room code, or open the join link they shared.
       </p>
       <input
         autoFocus
@@ -787,194 +740,6 @@ function HeatCodeScreen({
         <BackButton onClick={onBack} />
         <GameButton size="lg" style={{ flex: 1 }} disabled={!value.trim()} onClick={onNext}>
           Continue
-        </GameButton>
-      </div>
-    </GlassCard>
-  );
-}
-
-
-function OfficialScreen({
-  isOfficial,
-  identity,
-  onOfficialChange,
-  onIdentityChange,
-  onNext,
-  onBack,
-}: {
-  isOfficial: boolean;
-  identity: string;
-  onOfficialChange: (v: boolean) => void;
-  onIdentityChange: (v: string) => void;
-  onNext: () => void;
-  onBack: () => void;
-}) {
-  const [ackOfficial, setAckOfficial] = useState(false);
-  const emailOk = !isOfficial || identity.trim().includes("@");
-  const canContinue = emailOk && (!isOfficial || ackOfficial);
-
-  const pickPractice = () => {
-    setAckOfficial(false);
-    onOfficialChange(false);
-  };
-  const pickOfficial = () => onOfficialChange(true);
-
-  return (
-    <GlassCard className="p-4">
-      <h2
-        style={{
-          fontFamily: FO,
-          fontWeight: 700,
-          fontSize: 24,
-          color: "var(--sv-ink)",
-          marginBottom: 8,
-        }}
-      >
-        Official or practice?
-      </h2>
-      <p
-        style={{
-          fontFamily: FO,
-          fontSize: 14,
-          color: "var(--sv-text-secondary)",
-          marginBottom: 20,
-          lineHeight: 1.45,
-        }}
-      >
-        Official attempts count once per person for the event. Practice does not lock you
-        out.
-      </p>
-
-      <div className="flex flex-col gap-3 mb-6">
-        <SelectionCard active={!isOfficial} onClick={pickPractice}>
-          <div className="text-left">
-            <div style={{ fontFamily: FO, fontWeight: 600, fontSize: 15 }}>Practice</div>
-            <div
-              style={{
-                fontFamily: FO,
-                fontSize: 12,
-                color: "var(--sv-text-muted)",
-                marginTop: 2,
-              }}
-            >
-              Unlimited retries. Not ranked as official.
-            </div>
-          </div>
-        </SelectionCard>
-        <SelectionCard active={isOfficial} onClick={pickOfficial}>
-          <div className="text-left">
-            <div style={{ fontFamily: FO, fontWeight: 600, fontSize: 15 }}>
-              Official attempt
-            </div>
-            <div
-              style={{
-                fontFamily: FO,
-                fontSize: 12,
-                color: "var(--sv-text-muted)",
-                marginTop: 2,
-              }}
-            >
-              One per email for this group. Cannot be undone.
-            </div>
-          </div>
-        </SelectionCard>
-      </div>
-
-      {isOfficial && (
-        <>
-          <div
-            role="alert"
-            className="mb-4 p-3 rounded-xl text-left"
-            style={{
-              border: "1.5px solid var(--sv-warning)",
-              background: "rgba(180, 83, 9, 0.08)",
-            }}
-          >
-            <p
-              style={{
-                fontFamily: FO,
-                fontSize: 13,
-                fontWeight: 700,
-                color: "var(--sv-warning)",
-                margin: "0 0 6px",
-              }}
-            >
-              This cannot be undone
-            </p>
-            <p
-              style={{
-                fontFamily: FO,
-                fontSize: 13,
-                color: "var(--sv-text-secondary)",
-                margin: 0,
-                lineHeight: 1.45,
-              }}
-            >
-              Starting an official attempt locks this email for the group. You will not get a
-              second official try if you mis-order or refresh mid-game.
-            </p>
-          </div>
-
-          <label
-            htmlFor="player-identity"
-            style={{
-              display: "block",
-              fontFamily: FO,
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              color: "var(--sv-teal-mid)",
-              marginBottom: 8,
-            }}
-          >
-            Email (locks one attempt)
-          </label>
-          <input
-            id="player-identity"
-            type="email"
-            autoComplete="email"
-            value={identity}
-            onChange={(e) => onIdentityChange(e.target.value)}
-            placeholder="you@school.edu"
-            style={{
-              width: "100%",
-              fontFamily: FO,
-              fontSize: 16,
-              padding: "14px 16px",
-              borderRadius: 12,
-              border: "2px solid var(--sv-border)",
-              background: "rgba(255,255,255,0.8)",
-              color: "var(--sv-ink)",
-              marginBottom: 14,
-              outline: "none",
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && canContinue) onNext();
-            }}
-          />
-
-          <label
-            className="flex items-start gap-2.5 mb-5 cursor-pointer text-left"
-            style={{ fontFamily: FO }}
-          >
-            <input
-              type="checkbox"
-              checked={ackOfficial}
-              onChange={(e) => setAckOfficial(e.target.checked)}
-              style={{ marginTop: 3, accentColor: "var(--sv-teal-mid)" }}
-            />
-            <span style={{ fontSize: 13, color: "var(--sv-ink)", lineHeight: 1.4 }}>
-              I understand this is my only official attempt for this heat with this email.
-            </span>
-          </label>
-        </>
-      )}
-
-      <div className="flex gap-2">
-        <BackButton onClick={onBack} />
-        <GameButton size="lg" style={{ flex: 1 }} disabled={!canContinue} onClick={onNext}>
-          {isOfficial ? "Lock in & continue" : "Continue"}
         </GameButton>
       </div>
     </GlassCard>
@@ -1058,15 +823,14 @@ function LoadingScreen({
 
 // ---------------------------------------------------------
 // Main flow
-// Welcome → [Mode if solo practice enabled] →
+// Welcome → Mode →
 //   solo: PracticeFast → [Tutorial?] → Loading
-//   group: GroupCode? → Identity (name optional) → Official → [Tutorial?] → Loading
-// Groups are created by admin only (Sessions & data).
+//   heat: HeatCode → redirects to /join/[code]
 // ---------------------------------------------------------
 
 export default function OnboardingFlow() {
   const router = useRouter();
-  const { startSolo, joinHeat, submitting, error, reset } = useAttemptStore();
+  const { startSolo, submitting, error, reset } = useAttemptStore();
   const [gameConfig, setGameConfig] = useState<GameConfig>(DEFAULT_CONFIG);
   const [hoverPersona, setHoverPersona] = useState<PersonaSlug | null>(null);
   /**
@@ -1076,8 +840,6 @@ export default function OnboardingFlow() {
    * promote to "needed" after mount when tour not yet completed.
    */
   const [tutorialGate, setTutorialGate] = useState<"needed" | "skip">("skip");
-
-  const soloPracticeEnabled = gameConfig.solo_practice_enabled === true;
 
   useEffect(() => {
     // Defer past hydrate so progress-bar width matches SSR first paint.
@@ -1109,54 +871,32 @@ export default function OnboardingFlow() {
     };
   }, []);
 
-  // Empty defaults for SSR/hydrate parity; hydrate from storage + ?code= after mount.
-  // Default: join group (classroom). Solo only when admin enables it.
+  // Empty defaults for SSR/hydrate parity; hydrate from storage after mount.
   const [data, setData] = useState({
     persona: "" as PersonaSlug | "",
     name: "",
-    mode: "heat" as PlayMode,
+    mode: "solo" as PlayMode,
     heatCode: "",
-    isOfficial: false,
-    playerIdentity: "",
   });
 
-  // Always start at 0 for SSR hydrate parity; jump after mount if ?code= present.
   const [stepIndex, setStepIndex] = useState(0);
 
   useEffect(() => {
     const id = window.requestAnimationFrame(() => {
       const profile = readPlayerProfile();
-      const code = readQueryHeatCode();
-      const soloOn = loadAdminConfig().solo_practice_enabled === true;
       setData((prev) => ({
         ...prev,
         persona: (profile.persona ?? prev.persona) as PersonaSlug | "",
         name: profile.name ?? prev.name,
-        // Force group join for QR links; never leave solo selected when practice is off.
-        mode: code || !soloOn ? "heat" : prev.mode,
-        heatCode: code || prev.heatCode,
-        playerIdentity: readSavedIdentity() || prev.playerIdentity,
       }));
-      if (code) {
-        // Code already known from link → skip code step.
-        // welcome(0) → [mode(1)?] → identity (name optional)
-        setStepIndex(soloOn ? 2 : 1);
-      }
     });
     return () => window.cancelAnimationFrame(id);
   }, []);
 
-  // If admin turns solo off (or config loads with it off), force group-join mode.
-  useEffect(() => {
-    if (!soloPracticeEnabled && data.mode === "solo") {
-      setData((prev) => ({ ...prev, mode: "heat" }));
-    }
-  }, [soloPracticeEnabled, data.mode]);
-
   const updateData = <K extends keyof typeof data>(key: K, val: (typeof data)[K]) => {
     setData((prev) => {
-      const next = { ...prev, [key]: val };
-      if (key === "mode" && val === "solo") next.isOfficial = false;
+      // Explicit spread keeps all OnboardingData keys typed after generic key updates.
+      const next = { ...prev, [key]: val } as typeof prev;
 
       // Persist persona/name from the *next* state (avoid stale closures wiping fields).
       if (key === "persona" || key === "name") {
@@ -1176,9 +916,6 @@ export default function OnboardingFlow() {
 
       return next;
     });
-    if (key === "playerIdentity") {
-      saveIdentity(String(val).trim());
-    }
   };
 
   const next = () => setStepIndex((s) => s + 1);
@@ -1196,35 +933,16 @@ export default function OnboardingFlow() {
     return player;
   };
 
+  const goToJoinRoom = () => {
+    const code = data.heatCode.trim().toUpperCase();
+    if (!code) return;
+    router.push(`/join/${encodeURIComponent(code)}`);
+  };
+
   const runStart = async () => {
-    const player =
-      data.mode === "solo"
-        ? ensurePracticeProfile()
-        : data.name.trim() || "Player";
-    const profile = readPlayerProfile();
-    writePlayerProfile({
-      persona: data.persona || profile.persona || DEFAULT_PERSONA,
-      name: player,
-    });
+    const player = ensurePracticeProfile();
     try {
-      if (data.mode === "solo") {
-        if (!soloPracticeEnabled) {
-          throw new Error(
-            "Solo practice is turned off. Join a group with the access code from your host.",
-          );
-        }
-        const id = await startSolo(player);
-        router.push(`/play/${id}`);
-        return;
-      }
-      const code = data.heatCode.trim();
-      if (!code) {
-        throw new Error("Enter a group code first.");
-      }
-      const id = await joinHeat(code, player, {
-        is_official: data.isOfficial,
-        player_identity: data.playerIdentity.trim(),
-      });
+      const id = await startSolo(player);
       router.push(`/play/${id}`);
     } catch (err) {
       console.error(err);
@@ -1235,32 +953,24 @@ export default function OnboardingFlow() {
   const goToPlayOrTutorial = () => next();
 
   const showTutorial = tutorialGate === "needed";
-  /** Mode picker only when solo practice is an option. */
-  const showModeScreen = soloPracticeEnabled;
-  const effectiveMode: PlayMode =
-    soloPracticeEnabled && data.mode === "solo" ? "solo" : "heat";
 
   const allScreens = useMemo(() => {
     type Screen = { id: string; component: React.ReactNode };
     const screens: Screen[] = [
       { id: "welcome", component: <WelcomeScreen config={gameConfig} onNext={next} /> },
-    ];
-
-    if (showModeScreen) {
-      screens.push({
+      {
         id: "mode",
         component: (
           <ModeScreen
-            value={effectiveMode}
+            value={data.mode}
             onChange={(v) => updateData("mode", v)}
             onNext={next}
-            soloEnabled={soloPracticeEnabled}
           />
         ),
-      });
-    }
+      },
+    ];
 
-    if (effectiveMode === "solo") {
+    if (data.mode === "solo") {
       screens.push({
         id: "practiceFast",
         component: (
@@ -1278,92 +988,57 @@ export default function OnboardingFlow() {
           />
         ),
       });
-    } else {
-      // Group first (code), then optional name / avatar.
-      if (!data.heatCode.trim()) {
+
+      if (showTutorial) {
         screens.push({
-          id: "heatCode",
+          id: "tutorial",
           component: (
-            <HeatCodeScreen
-              value={data.heatCode}
-              onChange={(v) => updateData("heatCode", v)}
-              onNext={next}
-              onBack={back}
+            <OnboardingWarehouseTour
+              config={gameConfig}
+              onComplete={next}
             />
           ),
         });
       }
 
       screens.push({
-        id: "identity",
+        id: "loading",
         component: (
-          <IdentityScreen
-            persona={data.persona}
-            name={data.name}
-            onPersonaChange={(v) => updateData("persona", v)}
-            onNameChange={(v) => updateData("name", v)}
-            onNext={next}
-            onBack={back}
-            onHoverPersona={setHoverPersona}
+          <LoadingScreen
+            submitting={submitting}
+            error={error}
+            onHome={() => {
+              reset();
+              setStepIndex(0);
+            }}
+            onRetry={() => void runStart()}
+            onStart={() => void runStart()}
           />
         ),
       });
-
+    } else {
+      // Join a room: enter code → dedicated /join/[code] page
       screens.push({
-        id: "official",
+        id: "heatCode",
         component: (
-          <OfficialScreen
-            isOfficial={data.isOfficial}
-            identity={data.playerIdentity}
-            onOfficialChange={(v) => updateData("isOfficial", v)}
-            onIdentityChange={(v) => updateData("playerIdentity", v)}
-            onNext={goToPlayOrTutorial}
+          <HeatCodeScreen
+            value={data.heatCode}
+            onChange={(v) => updateData("heatCode", v)}
+            onNext={goToJoinRoom}
             onBack={back}
           />
         ),
       });
     }
-
-    if (showTutorial) {
-      screens.push({
-        id: "tutorial",
-        component: (
-          <OnboardingWarehouseTour
-            config={gameConfig}
-            onComplete={next}
-          />
-        ),
-      });
-    }
-
-    screens.push({
-      id: "loading",
-      component: (
-        <LoadingScreen
-          submitting={submitting}
-          error={error}
-          onHome={() => {
-            reset();
-            setStepIndex(0);
-          }}
-          onRetry={() => void runStart()}
-          onStart={() => void runStart()}
-        />
-      ),
-    });
 
     return screens;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuild when flow inputs change
   }, [
     gameConfig,
-    effectiveMode,
-    showModeScreen,
-    soloPracticeEnabled,
+    data.mode,
     data.name,
     data.persona,
     data.heatCode,
-    data.isOfficial,
-    data.playerIdentity,
     submitting,
     error,
     showTutorial,
@@ -1402,7 +1077,6 @@ export default function OnboardingFlow() {
   // Screens that already have their own Back control
   const hasInlineBack =
     stepId === "heatCode" ||
-    stepId === "official" ||
     stepId === "practiceFast" ||
     stepId === "tutorial";
 

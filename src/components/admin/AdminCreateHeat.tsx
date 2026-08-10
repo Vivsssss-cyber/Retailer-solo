@@ -34,7 +34,7 @@ export function AdminCreateHeat({ onCreated }: { onCreated?: () => void }) {
     setCreating(true);
     setError(null);
     try {
-      const result = await api.createHeat({ solo: false });
+      const result = await api.adminCreateRoom({});
       setHeat({ heat_id: result.heat_id, access_code: result.access_code });
       onCreated?.();
     } catch (e) {

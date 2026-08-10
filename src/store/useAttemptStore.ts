@@ -60,14 +60,6 @@ interface AttemptState {
   skipAnimation: boolean;
 
   startSolo: (playerName: string) => Promise<string>;
-  /**
-   * Create a multiplayer heat and return codes without starting an attempt.
-   * Host shows the code, then calls joinHeat(heat_id, name).
-   */
-  createHostedHeat: (playerName?: string) => Promise<{
-    heat_id: string;
-    access_code: string;
-  }>;
   joinHeat: (
     heatIdOrCode: string,
     playerName: string,
@@ -119,9 +111,6 @@ function syncOpening(attempt: Attempt): OpeningRoundView | null {
 
 /** Coalesce concurrent startSolo (Strict Mode double-effect, double-click). */
 let startSoloInflight: Promise<string> | null = null;
-/** Coalesce concurrent host heat create (Strict Mode / double click). */
-let createHostedHeatInflight: Promise<{ heat_id: string; access_code: string }> | null =
-  null;
 /** Coalesce concurrent joinHeat (Strict Mode remount / double submit). */
 let joinHeatInflight: Promise<string> | null = null;
 let joinHeatInflightKey: string | null = null;
@@ -163,37 +152,6 @@ export const useAttemptStore = create<AttemptState>((set, get) => ({
     })();
 
     return startSoloInflight;
-  },
-
-  async createHostedHeat(playerName?: string) {
-    if (createHostedHeatInflight) return createHostedHeatInflight;
-
-    createHostedHeatInflight = (async () => {
-      set({ error: null, submitting: true });
-      try {
-        const heat = await api.createHeat({
-          solo: false,
-          player_name: playerName,
-        });
-        persistHeatCode(heat.access_code);
-        set({
-          heatAccessCode: heat.access_code,
-          submitting: false,
-        });
-        return { heat_id: heat.heat_id, access_code: heat.access_code };
-      } catch (e) {
-        const { message } = parseApiFailure(e);
-        set({
-          error: message,
-          submitting: false,
-        });
-        throw e;
-      } finally {
-        createHostedHeatInflight = null;
-      }
-    })();
-
-    return createHostedHeatInflight;
   },
 
   async joinHeat(
