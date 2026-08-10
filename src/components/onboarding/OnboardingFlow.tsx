@@ -895,8 +895,8 @@ export default function OnboardingFlow() {
 
   const updateData = <K extends keyof typeof data>(key: K, val: (typeof data)[K]) => {
     setData((prev) => {
-      const next = { ...prev, [key]: val };
-      if (key === "mode" && val === "solo") next.isOfficial = false;
+      // Explicit spread keeps all OnboardingData keys typed after generic key updates.
+      const next = { ...prev, [key]: val } as typeof prev;
 
       // Persist persona/name from the *next* state (avoid stale closures wiping fields).
       if (key === "persona" || key === "name") {
@@ -916,13 +916,6 @@ export default function OnboardingFlow() {
 
       return next;
     });
-    if (key === "playerIdentity") {
-      saveIdentity(String(val).trim());
-    }
-    if (key === "mode") {
-      setHostedHeat(null);
-      setHostError(null);
-    }
   };
 
   const next = () => setStepIndex((s) => s + 1);
