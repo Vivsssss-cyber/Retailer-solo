@@ -26,9 +26,9 @@ export function parseApiFailure(err: unknown): { message: string; code?: string 
 function friendlyMessage(code: string | undefined, fallback: string): string {
   switch (code) {
     case "HEAT_FULL":
-      return "This heat is full. Ask the host to create a new heat, or join a different code.";
+      return "This group is full. Ask the host to create a new group, or join a different code.";
     case "ALREADY_ATTEMPTED":
-      return "You already used your official attempt for this heat. Use Solo practice, or join with a different identity.";
+      return "You already used your official attempt for this group. Use Solo practice, or join with a different identity.";
     case "HEAT_NOT_FOUND":
       return (
         fallback ||

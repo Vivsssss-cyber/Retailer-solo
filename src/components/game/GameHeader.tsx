@@ -126,7 +126,7 @@ export function GameHeader({
             <div className="flex items-center gap-1 sm:gap-2">
               {heatAccessCode && !heatAccessCode.startsWith("SOLO-") && (
                 <MetricPill
-                  label="Heat"
+                  label="Group"
                   value={heatAccessCode}
                   accent
                   className="hidden sm:flex"

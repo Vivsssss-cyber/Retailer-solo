@@ -32,6 +32,8 @@ export const DEFAULT_CONFIG: GameConfig = {
   leaderboard_enabled: true,
   global_leaderboard_enabled: true,
   animation_enabled: true,
+  /** Players join admin-created heats by default; practice is opt-in. */
+  solo_practice_enabled: false,
   info_panels: [
     {
       round: 1,
@@ -50,14 +52,19 @@ export const DEFAULT_CONFIG: GameConfig = {
  */
 export function migrateGameConfig(config: GameConfig): GameConfig {
   const version = config.configuration_version ?? 1;
+  let next: GameConfig = {
+    ...config,
+    // Older snapshots omit the flag — keep classroom default (join-only).
+    solo_practice_enabled: config.solo_practice_enabled === true,
+  };
   if (version <= 1 && config.maximum_order === LEGACY_MAXIMUM_ORDER) {
-    return {
-      ...config,
+    next = {
+      ...next,
       maximum_order: DEFAULT_CONFIG.maximum_order,
       configuration_version: Math.max(version, DEFAULT_CONFIG.configuration_version),
     };
   }
-  return config;
+  return next;
 }
 
 export function fingerprintFromConfig(config: GameConfig) {

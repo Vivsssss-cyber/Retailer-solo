@@ -274,6 +274,19 @@ export const mockAdapter: RetailerChallengeApi = {
   async createHeat(body: CreateHeatRequest): Promise<CreateHeatResponse> {
     const store = load();
     const configuration = activeConfig();
+    if (body.solo === true) {
+      if (!configuration.solo_practice_enabled) {
+        throw errorWithCode(
+          "BAD_REQUEST",
+          "Solo practice is turned off. Join a group with the access code from your host.",
+        );
+      }
+    } else if (!isAdminUnlocked()) {
+      throw errorWithCode(
+        "UNAUTHORIZED",
+        "Only an unlocked admin can create a classroom group.",
+      );
+    }
     const heat_id = id("heat");
     const access_code = body.solo ? `SOLO-${code(6)}` : code(8);
     store.heats[heat_id] = {

@@ -25,6 +25,12 @@ export interface GameConfig {
   leaderboard_enabled: boolean;
   global_leaderboard_enabled: boolean;
   animation_enabled: boolean;
+  /**
+   * When true, players can start a private solo practice game from onboarding.
+   * Classroom heats are always created by admin and joined via access code / QR.
+   * Default off — enable in admin game settings.
+   */
+  solo_practice_enabled: boolean;
   /** Optional coaching text shown at the start of a given round (1-based). */
   info_panels?: { round: number; text: string }[];
 }

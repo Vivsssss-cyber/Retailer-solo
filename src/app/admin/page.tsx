@@ -113,6 +113,7 @@ export default function AdminOverviewPage() {
               config.animation_enabled ? "anim" : null,
               config.leaderboard_enabled ? "heat LB" : null,
               config.global_leaderboard_enabled ? "global LB" : null,
+              config.solo_practice_enabled ? "solo practice" : "join-only",
             ]
               .filter(Boolean)
               .join(" · ") || "none"}
@@ -134,13 +135,13 @@ export default function AdminOverviewPage() {
           </Link>
           <Link href="/admin/data">
             <GameButton type="button" variant="secondary" size="sm">
-              Sessions &amp; data
+              Create group &amp; sessions
             </GameButton>
           </Link>
         </div>
         <p style={{ fontFamily: FO, fontSize: 12, color: "var(--sv-text-muted)", marginTop: 12 }}>
-          Changes apply to <strong>new heats only</strong>. Existing attempts keep the config snapshot
-          they started with (fairness).
+          Players join via access code / QR — only admins create groups. Solo practice is a toggle under
+          Game numbers. Config changes apply to <strong>new groups only</strong>.
         </p>
       </AdminSection>
     </AdminShell>

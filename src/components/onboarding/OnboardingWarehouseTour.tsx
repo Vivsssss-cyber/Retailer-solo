@@ -196,7 +196,7 @@ export function OnboardingWarehouseTour({
                 marginTop: 4,
               }}
             >
-              Heat ranks appear here
+              Group ranks appear here
             </p>
           </div>
         </div>

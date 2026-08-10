@@ -222,7 +222,7 @@ export function PerformanceReportView({
               {heatRank != null && (
                 <RankPill
                   icon={<Trophy size={14} color="var(--sv-teal-mid)" />}
-                  label="Heat rank"
+                  label="Group rank"
                   value={`#${heatRank}`}
                 />
               )}
@@ -296,7 +296,7 @@ export function PerformanceReportView({
             <div className="flex items-center gap-2 mb-4">
               <Trophy size={18} color="var(--sv-teal-mid)" />
               <h3 style={{ fontFamily: FO, fontWeight: 700, fontSize: 16, color: "var(--sv-ink)" }}>
-                Final Heat Leaderboard
+                Final Group Leaderboard
               </h3>
             </div>
             {leader && (
@@ -326,8 +326,8 @@ export function PerformanceReportView({
                     }}
                   >
                     {leader.player_name === attempt.player_name
-                      ? "You won the heat"
-                      : "Heat leader"}
+                      ? "You won the group"
+                      : "Group leader"}
                   </div>
                   <div
                     className="flex items-center gap-2"
@@ -422,7 +422,7 @@ export function PerformanceReportView({
                 You finished{" "}
                 <strong style={{ color: "var(--sv-ink)" }}>#{youRow.position}</strong>
                 {gapToWinner != null && gapToWinner > 0
-                  ? ` — $${gapToWinner.toLocaleString()} above the heat leader.`
+                  ? ` — $${gapToWinner.toLocaleString()} above the group leader.`
                   : "."}
               </p>
             )}
@@ -681,7 +681,7 @@ export function PerformanceReportView({
                 title: "Standing",
                 body:
                   heatRank != null
-                    ? `Heat rank #${heatRank}${globalRank != null ? ` · Global #${globalRank}` : ""}. Final cost $${report.final_cumulative_cost.toLocaleString()}.`
+                    ? `Group rank #${heatRank}${globalRank != null ? ` · Global #${globalRank}` : ""}. Final cost $${report.final_cumulative_cost.toLocaleString()}.`
                     : `Final cost $${report.final_cumulative_cost.toLocaleString()}.`,
               },
             ].map((item) => (

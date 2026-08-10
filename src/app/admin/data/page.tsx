@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { FO, GameButton, cardStyle } from "@/components/cyan";
 import { AdminShell, AdminSection, StatTile } from "@/components/admin/AdminShell";
+import { AdminCreateHeat } from "@/components/admin/AdminCreateHeat";
 import { lockAdmin } from "@/lib/adminConfigStore";
 import { api, USE_MOCK } from "@/services/api";
 
@@ -116,7 +117,7 @@ export default function AdminDataPage() {
   return (
     <AdminShell
       title="Sessions & data"
-      subtitle="Inspect heats and attempts stored in this session."
+      subtitle="Create classroom groups, share join links, and inspect sessions."
       actions={
         <>
           <GameButton type="button" size="sm" variant="secondary" onClick={() => void refresh()}>
@@ -137,6 +138,10 @@ export default function AdminDataPage() {
         </>
       }
     >
+      <div className="mb-4">
+        <AdminCreateHeat onCreated={() => void refresh()} />
+      </div>
+
       <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
         <p
           style={{
@@ -180,7 +185,7 @@ export default function AdminDataPage() {
           <AdminSection title="Heats">
             {heats.length === 0 ? (
               <p style={{ fontFamily: FO, fontSize: 13, color: "var(--sv-text-muted)" }}>
-                No heats yet. Start a solo or multiplayer game from the home page.
+                No groups yet. Create one above and share the code or join link with players.
               </p>
             ) : (
               <div className="overflow-x-auto">

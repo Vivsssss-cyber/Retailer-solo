@@ -142,6 +142,7 @@ export function normalizeGameConfig(input: GameConfig): GameConfig {
     leaderboard_enabled: !!cfg.leaderboard_enabled,
     global_leaderboard_enabled: !!cfg.global_leaderboard_enabled,
     animation_enabled: !!cfg.animation_enabled,
+    solo_practice_enabled: cfg.solo_practice_enabled === true,
     info_panels: panels,
     partner_logo: cfg.partner_logo,
   };

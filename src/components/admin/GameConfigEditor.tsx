@@ -351,7 +351,7 @@ export function GameNumbersSection({
             }
           />
         </Field>
-        <Field label="Max players / heat">
+        <Field label="Max players / group">
           <input
             type="number"
             min={1}
@@ -413,7 +413,24 @@ export function GameNumbersSection({
           checked={config.animation_enabled}
           onChange={(v) => update({ animation_enabled: v })}
         />
+        <Toggle
+          label="Solo practice (players)"
+          checked={config.solo_practice_enabled === true}
+          onChange={(v) => update({ solo_practice_enabled: v })}
+        />
       </div>
+      <p
+        style={{
+          fontFamily: FO,
+          fontSize: 12,
+          color: "var(--sv-text-muted)",
+          marginTop: 10,
+          lineHeight: 1.4,
+        }}
+      >
+        When solo practice is off, players can only join groups you create (code / QR).
+        Create and share groups from Sessions &amp; data.
+      </p>
     </AdminSection>
   );
 }

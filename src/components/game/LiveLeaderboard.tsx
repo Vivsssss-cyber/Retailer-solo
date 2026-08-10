@@ -104,7 +104,7 @@ export function LiveLeaderboard({
               color: "var(--sv-teal-mid)",
             }}
           >
-            {iWonFinal ? "You won the heat!" : "You’re #1 — keep leading"}
+            {iWonFinal ? "You won the group!" : "You’re #1 — keep leading"}
           </span>
         </div>
       )}
@@ -121,10 +121,10 @@ export function LiveLeaderboard({
           {tab === "global"
             ? "Completed attempts only · same configuration."
             : allFinished
-              ? "Final heat — cost, then backlog-weeks, then volatility."
+              ? "Final group — cost, then backlog-weeks, then volatility."
               : multiplayer
                 ? "Live race — progress first, cost second."
-                : "Solo run — invite others or join a heat for a live race."}
+                : "Solo run — invite others or join a group for a live race."}
         </p>
       )}
       <div className="flex-1 overflow-auto min-h-0">
@@ -185,7 +185,7 @@ export function LiveLeaderboard({
                     {isLeader ? (
                       <span
                         className="inline-flex items-center gap-0.5"
-                        title="Heat leader"
+                        title="Group leader"
                       >
                         <Trophy size={12} color="var(--sv-teal-mid)" />
                         <span key={r.position} className="sv-value-tick">
