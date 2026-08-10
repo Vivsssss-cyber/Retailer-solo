@@ -23,6 +23,7 @@ import {
   resetAdminConfig,
   saveAdminConfig,
 } from "@/lib/adminConfigStore";
+import { handleAdminAuthFailure } from "@/lib/adminAuthClient";
 import { api, USE_MOCK } from "@/services/api";
 import { parseApiFailure } from "@/services/apiErrors";
 import {
@@ -94,6 +95,7 @@ export function useAdminConfig() {
         "Saved to server. New heats (live API) will snapshot these numbers.",
       );
     } catch (e) {
+      if (handleAdminAuthFailure(e)) return;
       const { message: msg } = parseApiFailure(e);
       setMessage(`Save failed: ${msg}`);
     } finally {
@@ -119,6 +121,7 @@ export function useAdminConfig() {
       }
       setSavedAt(new Date().toLocaleTimeString());
     } catch (e) {
+      if (handleAdminAuthFailure(e)) return;
       const { message: msg } = parseApiFailure(e);
       setMessage(`Reset failed: ${msg}`);
     } finally {

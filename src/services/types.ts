@@ -92,9 +92,11 @@ export interface RetailerChallengeApi {
   completeAttempt(attemptId: string): Promise<CompleteAttemptResponse>;
   getHeatLeaderboard(heatId: string, mode: "live" | "final"): Promise<LeaderboardRow[]>;
   getGlobalLeaderboard(configurationId: string): Promise<LeaderboardRow[]>;
-  /** Live: server verifies PIN, sets httpOnly cookie. Mock: no-op. */
+  /** Live: server verifies PIN, sets httpOnly cookie. Mock: local unlock. */
   adminLogin(pin: string): Promise<{ ok: true }>;
   adminLogout(): Promise<{ ok: true }>;
+  /** Live: probe httpOnly session cookie. Mock: sessionStorage flag. */
+  getAdminSession(): Promise<{ authenticated: boolean }>;
   getAdminData(): Promise<{
     heats: Array<{
       heat_id: string;

@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { FO, GameButton, GridBackground, PageTransition, cardStyle } from "@/components/cyan";
 import { BookOpen, Package, Target, Trophy, Wallet } from "@/components/cyan/PixelIcons";
+import { logoutAdminAndReload } from "@/lib/adminAuthClient";
 
 const NAV = [
   { href: "/admin", label: "Overview", exact: true },
-  { href: "/admin/rooms", label: "Rooms" },
+  { href: "/admin/rooms", label: "Groups" },
   { href: "/admin/game", label: "Game numbers" },
   { href: "/admin/sequences", label: "Demand & supply" },
   { href: "/admin/data", label: "Sessions & data" },
@@ -26,6 +27,13 @@ export function AdminShell({
   actions?: ReactNode;
 }) {
   const pathname = usePathname();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const onLogout = () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    void logoutAdminAndReload();
+  };
 
   return (
     <GridBackground>
@@ -65,6 +73,15 @@ export function AdminShell({
             </div>
             <div className="flex flex-wrap gap-2 items-center">
               {actions}
+              <GameButton
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={loggingOut}
+                onClick={onLogout}
+              >
+                {loggingOut ? "Logging out…" : "Log out"}
+              </GameButton>
               <Link href="/">
                 <GameButton type="button" variant="outline" size="sm">
                   Back to game

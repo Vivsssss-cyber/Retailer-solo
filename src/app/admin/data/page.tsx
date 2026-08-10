@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { FO, GameButton, cardStyle } from "@/components/cyan";
 import { AdminShell, AdminSection, StatTile } from "@/components/admin/AdminShell";
 import { AdminCreateHeat } from "@/components/admin/AdminCreateHeat";
-import { lockAdmin } from "@/lib/adminConfigStore";
+import { handleAdminAuthFailure } from "@/lib/adminAuthClient";
 import { api, USE_MOCK } from "@/services/api";
+import { parseApiFailure } from "@/services/apiErrors";
 
 interface HeatRow {
   heat_id: string;
@@ -41,6 +42,7 @@ export default function AdminDataPage() {
       setAttempts(data.attempts);
       setStats(data.stats);
     } catch (e) {
+      if (handleAdminAuthFailure(e)) return;
       console.error("Failed to load admin data", e);
     } finally {
       setLoading(false);
@@ -57,6 +59,7 @@ export default function AdminDataPage() {
         setAttempts(data.attempts);
         setStats(data.stats);
       } catch (e) {
+        if (handleAdminAuthFailure(e)) return;
         console.error("Failed to load admin data", e);
       } finally {
         if (active) setLoading(false);
@@ -72,18 +75,20 @@ export default function AdminDataPage() {
     try {
       await api.toggleHeatStatus(heatId);
       await refresh();
-    } catch {
-      alert("Failed to toggle heat status");
+    } catch (e) {
+      if (handleAdminAuthFailure(e)) return;
+      alert(parseApiFailure(e).message || "Failed to toggle group status");
     }
   };
 
   const handleDeleteHeat = async (heatId: string, accessCode: string) => {
-    if (!confirm(`Are you sure you want to permanently delete heat ${accessCode} and all its attempts?`)) return;
+    if (!confirm(`Are you sure you want to permanently delete group ${accessCode} and all its attempts?`)) return;
     try {
       await api.deleteHeat(heatId);
       await refresh();
-    } catch {
-      alert("Failed to delete heat");
+    } catch (e) {
+      if (handleAdminAuthFailure(e)) return;
+      alert(parseApiFailure(e).message || "Failed to delete group");
     }
   };
 
@@ -119,23 +124,9 @@ export default function AdminDataPage() {
       title="Sessions & data"
       subtitle="Create classroom groups, share join links, and inspect sessions."
       actions={
-        <>
-          <GameButton type="button" size="sm" variant="secondary" onClick={() => void refresh()}>
-            Refresh
-          </GameButton>
-          <GameButton
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              lockAdmin();
-              if (!USE_MOCK) void api.adminLogout();
-              window.location.href = "/admin";
-            }}
-          >
-            Lock admin
-          </GameButton>
-        </>
+        <GameButton type="button" size="sm" variant="secondary" onClick={() => void refresh()}>
+          Refresh
+        </GameButton>
       }
     >
       <div className="mb-4">

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FO, GameButton, cardStyle } from "@/components/cyan";
 import { AdminSection } from "@/components/admin/AdminShell";
+import { handleAdminAuthFailure } from "@/lib/adminAuthClient";
 import { api, USE_MOCK } from "@/services/api";
 import { parseApiFailure } from "@/services/apiErrors";
 
@@ -38,6 +39,7 @@ export function AdminCreateHeat({ onCreated }: { onCreated?: () => void }) {
       setHeat({ heat_id: result.heat_id, access_code: result.access_code });
       onCreated?.();
     } catch (e) {
+      if (handleAdminAuthFailure(e)) return;
       const { message } = parseApiFailure(e);
       setError(message || "Could not create group");
     } finally {
