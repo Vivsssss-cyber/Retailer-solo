@@ -18,10 +18,12 @@ import {
 } from "@/engine";
 import { loadAdminConfig, saveAdminConfig } from "@/lib/adminConfigStore";
 import type {
+  AdminCreateRoomRequest,
   CompleteAttemptResponse,
   CreateAttemptRequest,
   CreateHeatRequest,
   CreateHeatResponse,
+  HeatSummary,
   RetailerChallengeApi,
   SubmitRoundRequest,
   SubmitRoundResponse,
@@ -241,10 +243,12 @@ export const mockAdapter: RetailerChallengeApi = {
   },
 
   async createHeat(body: CreateHeatRequest): Promise<CreateHeatResponse> {
+    // Player-facing create is solo-only. Multiplayer rooms use adminCreateRoom.
+    const solo = body.solo === true;
     const store = load();
     const configuration = activeConfig();
     const heat_id = id("heat");
-    const access_code = body.solo ? `SOLO-${code()}` : code();
+    const access_code = solo ? `SOLO-${code()}` : code();
     store.heats[heat_id] = {
       heat_id,
       access_code,
@@ -256,6 +260,42 @@ export const mockAdapter: RetailerChallengeApi = {
     store.codes[codeIndexKey(access_code)] = heat_id;
     save(store);
     return { heat_id, access_code, configuration };
+  },
+
+  async adminCreateRoom(body: AdminCreateRoomRequest = {}): Promise<CreateHeatResponse> {
+    // Mock has no real auth — admin UI is already PIN-gated in the browser.
+    return this.createHeat({ solo: false, player_name: body.player_name });
+  },
+
+  async getHeat(heatIdOrCode: string): Promise<HeatSummary> {
+    const store = load();
+    const key = normalizeHeatKey(heatIdOrCode);
+    let heat = store.heats[key] ?? store.heats[heatIdOrCode.trim()];
+    if (!heat) {
+      const byCode =
+        store.codes[key] ??
+        store.codes[codeIndexKey(heatIdOrCode)] ??
+        store.codes[heatIdOrCode.trim()] ??
+        store.codes[heatIdOrCode.trim().toUpperCase()];
+      if (byCode) heat = store.heats[byCode];
+    }
+    if (!heat) {
+      throw errorWithCode(
+        "HEAT_NOT_FOUND",
+        "Room not found. In mock mode, the code only works in this same browser.",
+      );
+    }
+    const maxPlayers = heat.access_code.startsWith("SOLO-")
+      ? 1
+      : heat.configuration.maximum_players_per_heat;
+    return {
+      heat_id: heat.heat_id,
+      access_code: heat.access_code,
+      configuration: heat.configuration,
+      attempt_count: heat.attempt_ids.length,
+      max_players: maxPlayers,
+      status: heat.status ?? "open",
+    };
   },
 
   async createAttempt(heatId: string, body: CreateAttemptRequest): Promise<Attempt> {
@@ -297,11 +337,20 @@ export const mockAdapter: RetailerChallengeApi = {
       );
     }
 
-    const identity = body.player_identity?.trim() || null;
     const isOfficial = body.is_official === true;
-    if (isOfficial && identity) {
+    let identity = body.player_identity?.trim() || null;
+    if (isOfficial) {
+      if (!identity) {
+        throw errorWithCode(
+          "BAD_REQUEST",
+          "Official attempts require an email or player ID",
+        );
+      }
+      identity = identity.toLowerCase();
       const dup = active.find(
-        (a) => a.is_official && a.player_identity === identity,
+        (a) =>
+          a.is_official &&
+          a.player_identity?.toLowerCase() === identity,
       );
       if (dup) {
         throw errorWithCode(

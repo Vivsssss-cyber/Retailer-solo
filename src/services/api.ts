@@ -67,8 +67,21 @@ const liveApi: RetailerChallengeApi = {
         "X-Admin-Pin": ADMIN_PIN,
       },
     }),
+  /** Public solo create — never send multiplayer without adminCreateRoom. */
   createHeat: (body) =>
-    request(`/heats`, { method: "POST", body: JSON.stringify(body) }),
+    request(`/heats`, {
+      method: "POST",
+      body: JSON.stringify({ ...body, solo: body.solo === true }),
+    }),
+  adminCreateRoom: (body = {}) =>
+    request(`/heats`, {
+      method: "POST",
+      body: JSON.stringify({ ...body, solo: false }),
+      headers: {
+        "X-Admin-Pin": ADMIN_PIN,
+      },
+    }),
+  getHeat: (heatIdOrCode) => request(heatPath(heatIdOrCode, "")),
   createAttempt: (heatId, body) =>
     request(attemptPath(heatId), {
       method: "POST",

@@ -18,6 +18,22 @@ export interface CreateHeatResponse {
   configuration: GameConfig;
 }
 
+/** Public heat/room summary for join page + admin detail. */
+export interface HeatSummary {
+  heat_id: string;
+  access_code: string;
+  configuration: GameConfig;
+  attempt_count: number;
+  max_players: number;
+  status: "open" | "closed";
+}
+
+/** Admin-only multiplayer room create (requires X-Admin-Pin in live mode). */
+export interface AdminCreateRoomRequest {
+  player_name?: string;
+  configuration_id?: string;
+}
+
 export interface CreateAttemptRequest {
   player_name: string;
   /** Stable identity for one-official-attempt lock (email / device id). */
@@ -52,7 +68,12 @@ export interface RetailerChallengeApi {
   getConfiguration(configurationId?: string): Promise<GameConfig>;
   /** Admin write — live API requires X-Admin-Pin; mock writes localStorage. */
   putConfiguration(config: GameConfig): Promise<GameConfig>;
+  /** Public: solo practice only from player UI. Multiplayer create uses adminCreateRoom. */
   createHeat(body: CreateHeatRequest): Promise<CreateHeatResponse>;
+  /** Admin-only multiplayer room (demo PIN on live). */
+  adminCreateRoom(body?: AdminCreateRoomRequest): Promise<CreateHeatResponse>;
+  /** Resolve heat by id or access code. */
+  getHeat(heatIdOrCode: string): Promise<HeatSummary>;
   createAttempt(heatId: string, body: CreateAttemptRequest): Promise<Attempt>;
   getAttempt(attemptId: string): Promise<Attempt | null>;
   submitRound(attemptId: string, body: SubmitRoundRequest): Promise<SubmitRoundResponse>;

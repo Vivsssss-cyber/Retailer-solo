@@ -102,6 +102,32 @@ describe("heat + attempt lifecycle", () => {
     ).rejects.toMatchObject({ code: "ALREADY_ATTEMPTED" });
   });
 
+  it("rejects official attempt without identity", async () => {
+    const heat = await createHeat({ solo: false });
+    await expect(
+      createAttempt(heat.heat_id, {
+        player_name: "Ava",
+        is_official: true,
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("canonicalizes official identity case", async () => {
+    const heat = await createHeat({ solo: false });
+    await createAttempt(heat.heat_id, {
+      player_name: "Ava",
+      player_identity: "Ava@Example.com",
+      is_official: true,
+    });
+    await expect(
+      createAttempt(heat.heat_id, {
+        player_name: "Ava 2",
+        player_identity: "ava@example.com",
+        is_official: true,
+      }),
+    ).rejects.toMatchObject({ code: "ALREADY_ATTEMPTED" });
+  });
+
   it("allows practice retries without identity lock", async () => {
     const heat = await createHeat({ solo: false });
     await createAttempt(heat.heat_id, {

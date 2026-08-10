@@ -8,6 +8,7 @@ import { BookOpen, Package, Target, Trophy, Wallet } from "@/components/cyan/Pix
 
 const NAV = [
   { href: "/admin", label: "Overview", exact: true },
+  { href: "/admin/rooms", label: "Rooms" },
   { href: "/admin/game", label: "Game numbers" },
   { href: "/admin/sequences", label: "Demand & supply" },
   { href: "/admin/data", label: "Sessions & data" },

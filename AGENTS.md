@@ -56,9 +56,11 @@ public/
 
 | Path | Purpose |
 |---|---|
-| `/` | Intro, name, solo start / join heat code |
+| `/` | Intro, solo practice / join room code |
+| `/join/[code]` | Player join via shared room link |
 | `/play/[attemptId]` | Active game + report |
 | `/admin` | Admin: game numbers, demand/supply, sessions (PIN `admin`) |
+| `/admin/rooms` | Create/share rooms (admin-only multiplayer create) |
 | `/admin/game` | Edit rounds, costs, starting state, coaching panels |
 | `/admin/sequences` | Per-round demand & supply rate editors |
 | `/admin/data` | Local heats/attempts + clear mock data |
@@ -138,15 +140,17 @@ Copy `.env.example` → `.env.local`:
 
 ### Known frontend gaps
 
-- ~~Create-heat + show access code UX~~ (done: Host a Heat mode + code share + header badge)  
+- ~~Create-heat + show access code UX~~ (done: admin Rooms create + share)  
+- ~~Admin room + join link~~ (done: `/admin/rooms`, `/join/[code]`, multiplayer create PIN-gated; public Host removed)  
 - ~~Live board polling during play~~ (done: 4s poll while status=playing)  
-- ~~Official one-attempt UX~~ (done: practice vs official + email lock + friendly errors)  
+- ~~Official one-attempt UX~~ (done: server requires identity when official; join path is practice-only)  
 - ~~True single-screen no-scroll densify~~ (done: 100dvh play shell + dense KPIs/charts)  
 - ~~Progressive density~~ (done: rounds 1–2 simplified + stronger coach; 3+ charts/history)  
-- ~~Onboarding fast path~~ (done: practice = avatar + name → start; heat/host full wizard)  
+- ~~Onboarding fast path~~ (done: practice = avatar + name → start; join → `/join/[code]`)  
 - ~~First-run interactive tutorial~~ (done: sample order → delay → costs; skippable once)  
-- ~~Official irreversible confirm~~ (done: warning + checkbox before lock-in)  
-- ~~Host classroom share~~ (done: large code, copy, QR, join link `?code=`, waiting copy)  
+- ~~Official irreversible confirm~~ (done for store path; join page is practice-only Phase 1)  
+- Admin room roster (names) — Phase 2 (count only today)  
+- Real admin auth (env session) — Phase 3 (demo PIN still client-visible)  
 
 ### Known backend gaps (B5–B6)
 

@@ -292,11 +292,22 @@ export async function createAttempt(
       );
     }
 
-    const identity = body.player_identity?.trim() || null;
     const isOfficial = body.is_official === true;
-    if (isOfficial && identity) {
+    let identity = body.player_identity?.trim() || null;
+    if (isOfficial) {
+      if (!identity) {
+        throw new ApiError(
+          "BAD_REQUEST",
+          "Official attempts require an email or player ID",
+          400,
+        );
+      }
+      // Canonicalize email-like identities for lock comparison
+      identity = identity.toLowerCase();
       const dup = active.find(
-        (a) => a.is_official && a.player_identity === identity,
+        (a) =>
+          a.is_official &&
+          a.player_identity?.toLowerCase() === identity,
       );
       if (dup) {
         throw new ApiError(
