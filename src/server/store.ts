@@ -66,6 +66,10 @@ function ensureSeeded(store: DataStore): DataStore {
   }
   for (const attempt of Object.values(store.attempts ?? {})) {
     attempt.configuration = migrateGameConfig(attempt.configuration);
+    // Legacy rows before player_token — mint so ownership can still be established via rejoin.
+    if (!attempt.player_token) {
+      attempt.player_token = "";
+    }
   }
   return store;
 }

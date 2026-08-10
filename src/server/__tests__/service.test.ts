@@ -58,21 +58,32 @@ describe("heat + attempt lifecycle", () => {
     expect(heat.configuration.total_rounds).toBe(12);
   });
 
-  it("creates attempt with starting pipeline", async () => {
+  it("multiplayer codes are 8 chars (QR classroom share)", async () => {
+    const heat = await createHeat({ solo: false });
+    expect(heat.access_code).toMatch(/^[A-Z2-9]{8}$/);
+    expect(heat.access_code.startsWith("SOLO-")).toBe(false);
+  });
+
+  it("creates attempt with starting pipeline + player token", async () => {
     const heat = await createHeat({ solo: true });
-    const attempt = await createAttempt(heat.heat_id, { player_name: "Ava" });
+    const { attempt, player_token } = await createAttempt(heat.heat_id, {
+      player_name: "Ava",
+    });
     expect(attempt.status).toBe("playing");
     expect(attempt.current_round).toBe(1);
     expect(attempt.inventory).toBe(DEFAULT_CONFIG.starting_inventory);
-    expect(attempt.pipeline).toEqual(
-      DEFAULT_CONFIG.starting_pipeline_orders,
-    );
+    expect(attempt.pipeline).toEqual(DEFAULT_CONFIG.starting_pipeline_orders);
     expect(attempt.rounds).toHaveLength(0);
+    expect(player_token.length).toBeGreaterThanOrEqual(32);
+    // Token must not leak on public attempt payload
+    expect(
+      (attempt as { player_token?: string }).player_token,
+    ).toBeUndefined();
   });
 
-  it("joins by access code", async () => {
+  it("joins by access code (QR / ?code= path)", async () => {
     const heat = await createHeat({ solo: false });
-    const attempt = await createAttempt(heat.access_code, {
+    const { attempt } = await createAttempt(heat.access_code, {
       player_name: "Bo",
     });
     expect(attempt.heat_id).toBe(heat.heat_id);
@@ -109,7 +120,7 @@ describe("heat + attempt lifecycle", () => {
       is_official: false,
       player_identity: "ava@example.com",
     });
-    const second = await createAttempt(heat.heat_id, {
+    const { attempt: second } = await createAttempt(heat.heat_id, {
       player_name: "Ava 2",
       is_official: false,
       player_identity: "ava@example.com",
@@ -121,7 +132,7 @@ describe("heat + attempt lifecycle", () => {
 describe("submitRound", () => {
   it("recomputes server-side and advances state", async () => {
     const heat = await createHeat({ solo: true });
-    const attempt = await createAttempt(heat.heat_id, { player_name: "Ava" });
+    const { attempt } = await createAttempt(heat.heat_id, { player_name: "Ava" });
 
     const res = await submitRound(attempt.attempt_id, {
       round: 1,
@@ -141,19 +152,17 @@ describe("submitRound", () => {
 
   it("clamps order to max", async () => {
     const heat = await createHeat({ solo: true });
-    const attempt = await createAttempt(heat.heat_id, { player_name: "Ava" });
+    const { attempt } = await createAttempt(heat.heat_id, { player_name: "Ava" });
     const res = await submitRound(attempt.attempt_id, {
       round: 1,
       placed_order: DEFAULT_CONFIG.maximum_order + 1,
     });
-    expect(res.round_record.placed_order).toBe(
-      DEFAULT_CONFIG.maximum_order,
-    );
+    expect(res.round_record.placed_order).toBe(DEFAULT_CONFIG.maximum_order);
   });
 
   it("rejects round mismatch", async () => {
     const heat = await createHeat({ solo: true });
-    const attempt = await createAttempt(heat.heat_id, { player_name: "Ava" });
+    const { attempt } = await createAttempt(heat.heat_id, { player_name: "Ava" });
     await expect(
       submitRound(attempt.attempt_id, { round: 3, placed_order: 4 }),
     ).rejects.toMatchObject({ code: "ROUND_MISMATCH" });
@@ -161,7 +170,7 @@ describe("submitRound", () => {
 
   it("rejects double-submit (round locked)", async () => {
     const heat = await createHeat({ solo: true });
-    const attempt = await createAttempt(heat.heat_id, { player_name: "Ava" });
+    const { attempt } = await createAttempt(heat.heat_id, { player_name: "Ava" });
     await submitRound(attempt.attempt_id, { round: 1, placed_order: 4 });
     await expect(
       submitRound(attempt.attempt_id, { round: 1, placed_order: 8 }),
@@ -171,11 +180,11 @@ describe("submitRound", () => {
   it("GET attempt restores mid-game state", async () => {
     const heat = await createHeat({ solo: true });
     const created = await createAttempt(heat.heat_id, { player_name: "Ava" });
-    const after = await submitRound(created.attempt_id, {
+    const after = await submitRound(created.attempt.attempt_id, {
       round: 1,
       placed_order: 5,
     });
-    const loaded = getAttempt(created.attempt_id);
+    const loaded = getAttempt(created.attempt.attempt_id);
     expect(loaded.current_round).toBe(2);
     expect(loaded.inventory).toBe(after.attempt.inventory);
     expect(loaded.pipeline).toEqual(after.attempt.pipeline);
@@ -186,7 +195,7 @@ describe("submitRound", () => {
 describe("full game + report", () => {
   it("runs 12 rounds, completes, no round 13", async () => {
     const heat = await createHeat({ solo: true });
-    let attempt = await createAttempt(heat.heat_id, { player_name: "Ava" });
+    let { attempt } = await createAttempt(heat.heat_id, { player_name: "Ava" });
 
     for (let r = 1; r <= 12; r++) {
       const res = await submitRound(attempt.attempt_id, {
@@ -205,9 +214,7 @@ describe("full game + report", () => {
     ).rejects.toBeInstanceOf(ApiError);
 
     const complete = await completeAttempt(attempt.attempt_id);
-    expect(complete.report.final_cumulative_cost).toBe(
-      attempt.cumulative_cost,
-    );
+    expect(complete.report.final_cumulative_cost).toBe(attempt.cumulative_cost);
     expect(complete.heat_rank).toBe(1);
     expect(complete.heat_winner_cost).toBe(attempt.cumulative_cost);
   });
@@ -216,8 +223,12 @@ describe("full game + report", () => {
 describe("leaderboards", () => {
   it("live sort prefers more completed rounds then lower cost", async () => {
     const heat = await createHeat({ solo: false });
-    const a = await createAttempt(heat.heat_id, { player_name: "Fast" });
-    const b = await createAttempt(heat.heat_id, { player_name: "Slow" });
+    const { attempt: a } = await createAttempt(heat.heat_id, {
+      player_name: "Fast",
+    });
+    const { attempt: b } = await createAttempt(heat.heat_id, {
+      player_name: "Slow",
+    });
 
     await submitRound(a.attempt_id, { round: 1, placed_order: 10 });
     await submitRound(a.attempt_id, { round: 2, placed_order: 10 });
@@ -231,7 +242,9 @@ describe("leaderboards", () => {
 
   it("global board only includes completed attempts", async () => {
     const heat = await createHeat({ solo: true });
-    const a = await createAttempt(heat.heat_id, { player_name: "Done" });
+    const { attempt: a } = await createAttempt(heat.heat_id, {
+      player_name: "Done",
+    });
     for (let r = 1; r <= 12; r++) {
       await submitRound(a.attempt_id, { round: r, placed_order: 5 });
     }
@@ -247,14 +260,22 @@ describe("leaderboards", () => {
 
 describe("admin controls", () => {
   it("compiles admin stats and data, handles status toggle, and deletion", async () => {
-    const { getAdminStats, getAdminData, clearAdminData, toggleHeatStatus, deleteHeat } = await import("../service");
+    const {
+      getAdminStats,
+      getAdminData,
+      clearAdminData,
+      toggleHeatStatus,
+      deleteHeat,
+    } = await import("../service");
 
     let stats = getAdminStats();
     expect(stats.heats).toBe(0);
     expect(stats.attempts).toBe(0);
 
     const heat = await createHeat({ solo: false });
-    const attempt = await createAttempt(heat.heat_id, { player_name: "Admin Tester" });
+    const { attempt } = await createAttempt(heat.heat_id, {
+      player_name: "Admin Tester",
+    });
     expect(attempt.player_name).toBe("Admin Tester");
 
     stats = getAdminStats();
@@ -264,28 +285,24 @@ describe("admin controls", () => {
 
     const data = getAdminData();
     expect(data.heats).toHaveLength(1);
-    expect(data.heats[0].access_code).toBe(heat.access_code);
-    expect(data.heats[0].status).toBe("open");
+    expect(data.heats[0]!.access_code).toBe(heat.access_code);
+    expect(data.heats[0]!.status).toBe("open");
     expect(data.attempts).toHaveLength(1);
-    expect(data.attempts[0].player_name).toBe("Admin Tester");
+    expect(data.attempts[0]!.player_name).toBe("Admin Tester");
 
-    // toggle heat status
     const status = await toggleHeatStatus(heat.heat_id);
     expect(status).toBe("closed");
-    expect(getAdminData().heats[0].status).toBe("closed");
+    expect(getAdminData().heats[0]!.status).toBe("closed");
 
-    // should reject new attempt if heat is closed
     await expect(
-      createAttempt(heat.heat_id, { player_name: "Late Player" })
+      createAttempt(heat.heat_id, { player_name: "Late Player" }),
     ).rejects.toMatchObject({ code: "HEAT_NOT_FOUND" });
 
-    // delete heat
     await deleteHeat(heat.heat_id);
     stats = getAdminStats();
     expect(stats.heats).toBe(0);
     expect(stats.attempts).toBe(0);
 
-    // clear admin data
     const heat2 = await createHeat({ solo: true });
     await createAttempt(heat2.heat_id, { player_name: "Clear Tester" });
     expect(getAdminStats().heats).toBe(1);
@@ -293,4 +310,3 @@ describe("admin controls", () => {
     expect(getAdminStats().heats).toBe(0);
   });
 });
-

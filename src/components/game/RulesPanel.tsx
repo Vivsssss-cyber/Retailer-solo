@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { COACH_AVATAR_SRC } from "@/lib/personas";
+import { coachSrc } from "@/lib/personas";
 import { InteractiveTutorial } from "@/components/onboarding/InteractiveTutorial";
 import type { GameConfig } from "@/engine";
 
@@ -81,12 +81,12 @@ export function RulesPanel({
 
         <div className="pointer-events-none shrink-0 z-20 sm:-ml-4 mb-[-8px] sm:mb-0">
           <Image
-            src={COACH_AVATAR_SRC}
+            src={coachSrc("explain")}
             alt="Coach"
-            width={120}
-            height={160}
+            width={144}
+            height={192}
             unoptimized
-            className="h-[100px] sm:h-[120px] lg:h-[132px] w-auto object-contain [image-rendering:pixelated] drop-shadow-xl"
+            className="h-[120px] sm:h-[144px] lg:h-[158px] w-auto object-contain object-bottom [image-rendering:pixelated] drop-shadow-xl"
           />
         </div>
       </aside>

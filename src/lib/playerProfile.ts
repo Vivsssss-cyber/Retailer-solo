@@ -19,6 +19,37 @@ export interface PlayerProfile {
 
 const EMPTY: PlayerProfile = { persona: null, name: null };
 
+/** Same-tab listeners for useSyncExternalStore (storage events are cross-tab only). */
+const listeners = new Set<() => void>();
+
+function emitProfileChange(): void {
+  for (const listener of listeners) {
+    try {
+      listener();
+    } catch {
+      /* ignore subscriber errors */
+    }
+  }
+}
+
+/** Subscribe to profile writes in this tab (+ cross-tab storage events). */
+export function subscribePlayerProfile(onStoreChange: () => void): () => void {
+  listeners.add(onStoreChange);
+  if (typeof window !== "undefined") {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === PLAYER_PROFILE_KEY || e.key === null) onStoreChange();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      listeners.delete(onStoreChange);
+      window.removeEventListener("storage", onStorage);
+    };
+  }
+  return () => {
+    listeners.delete(onStoreChange);
+  };
+}
+
 function parseProfile(raw: string | null): PlayerProfile | null {
   if (!raw) return null;
   try {
@@ -83,6 +114,7 @@ export function writePlayerProfile(partial: {
     window.localStorage.setItem(PLAYER_PROFILE_KEY, json);
     // Keep session in sync for any code that still reads it.
     window.sessionStorage.setItem(PLAYER_PROFILE_KEY, json);
+    emitProfileChange();
   } catch {
     /* quota / private mode */
   }

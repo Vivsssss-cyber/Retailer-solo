@@ -1,16 +1,14 @@
 "use client";
 
-import React, { useLayoutEffect, useRef, useState } from "react";
+import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+
 import {
-  CartesianGrid,
-  Dot,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 
 export interface EvolutionChartData {
   title?: string;
@@ -18,19 +16,11 @@ export interface EvolutionChartData {
   xAxis?: string;
   type?: "evolution";
   chartData?: Record<string, string | number>[];
-  /**
-   * Chart plot height in px (preferred for report / non-fill cards).
-   * Avoid `"100%"` alone — Recharts ResponsiveContainer collapses to 0 when the
-   * parent only has min-height (common on mobile scroll layouts).
-   * When `embedded`/`fill`, height is measured from the flex parent instead.
-   */
+  /** Chart plot height in px (reports / standalone cards). */
   height?: number | string;
-  /** Nest inside TrendPanel card — drop outer chrome so we don't double-card. */
+  /** Nest inside a card that already provides chrome — drop our own card. */
   embedded?: boolean;
-  /**
-   * Fill available parent height via ResizeObserver (pixel height fed to Recharts).
-   * Defaults to true when `embedded` is set.
-   */
+  /** Fill the parent's height instead of using `height`. Defaults to `embedded`. */
   fill?: boolean;
 }
 
@@ -43,6 +33,69 @@ const MIN_FILL_H = 120;
 
 /** Default-on series for multi-metric flow charts. */
 const DEFAULT_ON = new Set(["inventory", "stock", "backlog", "demand"]);
+
+/** One plotted metric: raw data key + css-safe slug used for shadcn config/colors. */
+interface Series {
+  /** Key as declared by the caller (matches a field in chartData rows). */
+  dataKey: string;
+  /** CSS-safe id — drives `--color-<slug>` from ChartStyle and tooltip lookups. */
+  slug: string;
+  label: string;
+  color: string;
+  cost: boolean;
+}
+
+function slugify(key: string): string {
+  return (
+    key
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "series"
+  );
+}
+
+function isCostKey(key: string): boolean {
+  return key.toLowerCase().includes("cost");
+}
+
+/** Legend / tooltip label for series keys. */
+function seriesLabel(key: string): string {
+  const l = key.toLowerCase();
+  if (l === "total cost" || l === "totalcost" || l === "costs") return "Cost";
+  if (l === "inventory" || l === "stock") return "Inventory";
+  if (l === "backlog") return "Backlog";
+  if (l === "demand") return "Demand";
+  if (l === "delivery") return "Delivery";
+  if (l.includes("order")) return "Orders";
+  return key;
+}
+
+function seriesColor(key: string): string {
+  const l = key.toLowerCase();
+  if (l === "backlog") return "var(--sv-ink)";
+  if (l.includes("order")) return "var(--sv-warning)";
+  if (l === "demand") return "var(--sv-chart-3)";
+  if (l === "delivery") return "var(--sv-positive)";
+  if (l.includes("cost")) return "var(--sv-teal-mid)";
+  if (l === "inventory" || l === "stock") return "var(--sv-cyan)";
+  return "var(--sv-chart-1)";
+}
+
+function buildSeries(yAxis: string[] | undefined): Series[] {
+  const used = new Set<string>();
+  return (yAxis ?? []).map((dataKey) => {
+    let slug = slugify(dataKey);
+    while (used.has(slug)) slug = `${slug}-x`;
+    used.add(slug);
+    return {
+      dataKey,
+      slug,
+      label: seriesLabel(dataKey),
+      color: seriesColor(dataKey),
+      cost: isCostKey(dataKey),
+    };
+  });
+}
 
 /**
  * Flow charts (inventory + backlog + demand + …): start with only those three on.
@@ -79,24 +132,16 @@ function niceCeil(n: number): number {
   return nf * base;
 }
 
-/**
- * Units (inventory / backlog / demand): non-negative integers, padded top.
- * Cost: always from $0, nice integer ceiling.
- */
-function unitDomain(
-  [lo, hi]: readonly [number, number],
-): [number, number] {
+/** Units (inventory / backlog / demand): non-negative integers, padded top. */
+function unitDomain([lo, hi]: readonly [number, number]): [number, number] {
   const rawMax = Math.max(hi, lo, 0);
-  const max = niceCeil(Math.max(rawMax * 1.08, 4));
-  return [0, max];
+  return [0, niceCeil(Math.max(rawMax * 1.08, 4))];
 }
 
-function costDomain(
-  [lo, hi]: readonly [number, number],
-): [number, number] {
+/** Cost: always from $0, nice integer ceiling. */
+function costDomain([lo, hi]: readonly [number, number]): [number, number] {
   void lo;
-  const max = niceCeil(Math.max(hi * 1.08, 10));
-  return [0, max];
+  return [0, niceCeil(Math.max(hi * 1.08, 10))];
 }
 
 /** Whole units — beer-game stock never needs decimals on the axis. */
@@ -117,35 +162,12 @@ function formatCostTick(value: number): string {
   return `$${n.toLocaleString()}`;
 }
 
-function isCostSeries(name: string): boolean {
-  return name.toLowerCase().includes("cost");
-}
-
-/** Legend / tooltip label for series keys. */
-function seriesLabel(key: string): string {
-  const l = key.toLowerCase();
-  if (l === "total cost" || l === "totalcost" || l === "costs") return "Cost";
-  if (l === "inventory" || l === "stock") return "Inventory";
-  if (l === "backlog") return "Backlog";
-  if (l === "demand") return "Demand";
-  if (l === "delivery") return "Delivery";
-  if (l.includes("order")) return "Orders";
-  return key;
-}
-
-function formatTooltipValue(value: unknown, name: unknown): [string, string] {
-  const label = seriesLabel(String(name ?? ""));
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return ["—", label];
-  if (isCostSeries(String(name ?? ""))) {
-    return [`$${Math.round(n).toLocaleString()}`, label];
-  }
-  return [String(Math.round(n)), label];
-}
-
 /**
- * Beer Game evolution chart — ported from classic GraphicalView (type: evolution).
- * Used on /demo/beer-game dashboard and reports.
+ * Beer Game evolution chart, built on the shadcn `chart` primitives
+ * (ChartContainer / ChartTooltip / ChartTooltipContent) over Recharts.
+ *
+ * Only series declared in `yAxis` are plotted, so a cost-only chart never
+ * picks up flow keys that happen to share the same `chartData` rows.
  */
 export default function GraphicalView({ data }: GraphicalViewProps) {
   const [disabledMetrics, setDisabledMetrics] = useState<string[]>(() =>
@@ -156,50 +178,42 @@ export default function GraphicalView({ data }: GraphicalViewProps) {
   const embedded = Boolean(data.embedded);
   const fixedHeight = resolveFixedHeight(data.height);
 
-  const plotHostRef = useRef<HTMLDivElement>(null);
-  const [plotSize, setPlotSize] = useState({ w: 0, h: fixedHeight });
+  // Width only — ChartContainer owns height. Ticks/margins tighten when narrow.
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
 
   useLayoutEffect(() => {
-    const el = plotHostRef.current;
+    const el = hostRef.current;
     if (!el) return;
-
     const measure = () => {
       const w = Math.round(el.clientWidth);
-      const h = Math.round(el.clientHeight);
-      setPlotSize((prev) => {
-        const nextH = fill
-          ? Math.max(h > 0 ? h : fixedHeight, MIN_FILL_H)
-          : fixedHeight;
-        const nextW = w > 0 ? w : prev.w;
-        if (prev.w === nextW && prev.h === nextH) return prev;
-        return { w: nextW, h: nextH };
-      });
+      setWidth((prev) => (w > 0 && w !== prev ? w : prev));
     };
-
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [fill, fixedHeight, data.chartData?.length]);
+  }, []);
+
+  const allSeries = useMemo(() => buildSeries(data.yAxis), [data.yAxis]);
+
+  const chartConfig = useMemo<ChartConfig>(() => {
+    const cfg: ChartConfig = {};
+    for (const s of allSeries) cfg[s.slug] = { label: s.label, color: s.color };
+    return cfg;
+  }, [allSeries]);
 
   if (!data?.chartData || data.chartData.length === 0) {
     return (
       <div
+        className="flex items-center justify-center rounded-2xl text-center text-[13px] leading-snug text-muted-foreground"
         style={{
           background: embedded ? "transparent" : "var(--sv-card)",
           border: embedded ? "none" : "1.4px solid white",
-          borderRadius: 16,
           padding: embedded ? 12 : 20,
           minHeight: fill ? MIN_FILL_H : 200,
           height: fill || embedded ? "100%" : undefined,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
           fontFamily: "var(--sv-font-ui)",
-          color: "var(--sv-text-muted)",
-          fontSize: 13,
-          textAlign: "center",
-          lineHeight: 1.4,
         }}
       >
         No round data yet — place your first order to build the trend.
@@ -207,31 +221,16 @@ export default function GraphicalView({ data }: GraphicalViewProps) {
     );
   }
 
-  const isMetricEnabled = (metricName: string) => !disabledMetrics.includes(metricName);
+  const active = allSeries.filter((s) => !disabledMetrics.includes(s.dataKey));
+  const costSeries = active.filter((s) => s.cost);
+  const unitSeries = active.filter((s) => !s.cost);
+  const showCosts = costSeries.length > 0;
+  // Cost-only chart → cost owns the left axis (no empty "Units" scale).
+  const costsOnLeft = showCosts && unitSeries.length === 0;
+  const showRightAxis = showCosts && !costsOnLeft;
 
-  const stockKey =
-    data.yAxis?.find(
-      (y) => y.toLowerCase() === "stock" || y.toLowerCase() === "inventory",
-    ) || "Inventory";
-  const showStock = isMetricEnabled(stockKey);
-  const showBacklog =
-    data.yAxis?.some((y) => y.toLowerCase() === "backlog" && isMetricEnabled(y)) ?? false;
-  const showOrders =
-    data.yAxis?.some((y) => y.toLowerCase().includes("order") && isMetricEnabled(y)) ?? false;
-  const showDemand =
-    data.yAxis?.some((y) => y.toLowerCase() === "demand" && isMetricEnabled(y)) ?? false;
-  const showDelivery =
-    data.yAxis?.some((y) => y.toLowerCase() === "delivery" && isMetricEnabled(y)) ?? false;
-
-  const costKeys =
-    data.yAxis?.filter((y) => y.toLowerCase().includes("cost") && isMetricEnabled(y)) || [];
-  const showCosts = costKeys.length > 0;
-  const hasUnits = showStock || showBacklog || showOrders || showDemand || showDelivery;
-  const costsOnLeft = showCosts && !hasUnits;
-
-  const plotHeight = fill ? plotSize.h : fixedHeight;
-  const narrow = plotSize.w > 0 && plotSize.w < 420;
-  const veryNarrow = plotSize.w > 0 && plotSize.w < 320;
+  const narrow = width > 0 && width < 420;
+  const veryNarrow = width > 0 && width < 320;
   const tickFs = veryNarrow ? 9 : narrow ? 10 : 11;
   const labelFs = veryNarrow ? 10 : 12;
   const pointCount = data.chartData.length;
@@ -241,16 +240,13 @@ export default function GraphicalView({ data }: GraphicalViewProps) {
   // Dense play cards: drop axis titles (they clip) and keep tight but safe gutters.
   // Never use negative margins — they pull ticks outside the SVG and get clipped.
   const showAxisTitles = !embedded && !veryNarrow;
+  // Rotated Y titles collide with the tick column below ~420px — x title stays.
+  const showYAxisTitles = showAxisTitles && !narrow;
   const chartMargin = embedded
-    ? {
-        top: 10,
-        right: showCosts && !costsOnLeft ? (narrow ? 10 : 14) : 8,
-        left: 2,
-        bottom: 4,
-      }
+    ? { top: 10, right: showRightAxis ? (narrow ? 10 : 14) : 8, left: 2, bottom: 4 }
     : {
         top: narrow ? 14 : 18,
-        right: showCosts && !costsOnLeft ? (narrow ? 14 : 20) : narrow ? 10 : 14,
+        right: showRightAxis ? (narrow ? 14 : 20) : narrow ? 10 : 14,
         left: 4,
         bottom: showAxisTitles ? (narrow ? 18 : 22) : narrow ? 8 : 10,
       };
@@ -265,36 +261,28 @@ export default function GraphicalView({ data }: GraphicalViewProps) {
       : narrow
         ? 40
         : 48;
-  const yRightWidth = narrow ? 44 : 56;
 
-  const toggle = (key: string) => {
+  const toggle = (key: string) =>
     setDisabledMetrics((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
     );
-  };
 
-  const legendItems = (data.yAxis ?? []).map((key) => {
-    const lower = key.toLowerCase();
-    let color = "var(--sv-chart-1)";
-    if (lower === "backlog") color = "var(--sv-ink)";
-    else if (lower.includes("order")) color = "var(--sv-warning)";
-    else if (lower === "demand") color = "var(--sv-chart-3)";
-    else if (lower === "delivery") color = "var(--sv-positive)";
-    else if (lower.includes("cost")) color = "var(--sv-teal-mid)";
-    else if (lower === "inventory" || lower === "stock") color = "var(--sv-cyan)";
-    return {
-      key,
-      label: seriesLabel(key),
-      color,
-      enabled: isMetricEnabled(key),
-    };
-  });
+  const axisTick = {
+    fill: "var(--sv-text-muted)",
+    fontSize: tickFs,
+    fontFamily: "var(--sv-font-ui)",
+  };
+  const axisLabelStyle = {
+    fill: "var(--sv-text-muted)",
+    fontSize: labelFs,
+    fontFamily: "var(--sv-font-ui)",
+  };
 
   return (
     <div
       className={[
         "sv-chart",
-        fill || embedded ? "h-full min-h-0 flex flex-col w-full min-w-0" : "",
+        fill || embedded ? "flex h-full min-h-0 w-full min-w-0 flex-col" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -312,7 +300,7 @@ export default function GraphicalView({ data }: GraphicalViewProps) {
               border: "1.4px solid white",
               borderRadius: 16,
               padding: narrow ? 14 : 18,
-              minHeight: fill ? 0 : plotHeight + 56,
+              minHeight: fill ? 0 : fixedHeight + 56,
               height: fill ? "100%" : undefined,
               boxShadow:
                 "inset 0 1px 0 rgba(255,255,255,0.75), 0 4px 14px rgba(0, 44, 51, 0.04)",
@@ -324,413 +312,201 @@ export default function GraphicalView({ data }: GraphicalViewProps) {
     >
       {data.title ? (
         <h3
-          className="shrink-0"
+          className="shrink-0 tracking-[-0.02em]"
           style={{
             fontFamily: "var(--sv-font-ui)",
             fontWeight: 800,
             fontSize: narrow ? 14 : 16,
             color: "var(--sv-ink)",
             marginBottom: 10,
-            letterSpacing: "-0.02em",
           }}
         >
           {data.title}
         </h3>
       ) : null}
 
-      <div
-        className={`flex flex-wrap gap-1.5 sm:gap-2 shrink-0 ${embedded ? "mb-2" : "mb-2.5"}`}
-      >
-        {legendItems.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            onClick={() => toggle(item.key)}
-            className="sv-press touch-manipulation min-h-8 sm:min-h-0"
-            style={{
-              fontFamily: "var(--sv-font-ui)",
-              fontSize: veryNarrow ? 10 : 11,
-              fontWeight: 600,
-              padding: veryNarrow ? "4px 8px" : "5px 10px",
-              borderRadius: 9999,
-              border: "1px solid var(--sv-border)",
-              background: item.enabled
-                ? "var(--sv-cyan-tint)"
-                : "color-mix(in srgb, white 60%, transparent)",
-              color: item.enabled ? "var(--sv-ink)" : "var(--sv-text-muted)",
-              opacity: item.enabled ? 1 : 0.55,
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            {/* Cyan-graphs legend tick — vertical accent, not a floating dot */}
-            <span
-              aria-hidden
-              style={{
-                width: 3,
-                height: 12,
-                borderRadius: 2,
-                background: item.color,
-                opacity: item.enabled ? 1 : 0.4,
-                flexShrink: 0,
-              }}
-            />
-            {item.label}
-          </button>
-        ))}
-      </div>
-
       {/*
-        Fill mode: host is flex-1 and measured → pixel height for Recharts.
-        Fixed mode: explicit pixel height (reports / standalone cards).
-        overflow:visible so dots / axis ticks are not clipped by the host.
+        Interactive legend — shadcn's ChartLegendContent is display-only and
+        series toggling is a shipped affordance here, so we keep buttons and
+        style them from the same semantic tokens.
       */}
       <div
-        ref={plotHostRef}
+        className={`flex shrink-0 flex-wrap gap-1.5 sm:gap-2 ${embedded ? "mb-2" : "mb-2.5"}`}
+      >
+        {allSeries.map((s) => {
+          const enabled = !disabledMetrics.includes(s.dataKey);
+          return (
+            <button
+              key={s.dataKey}
+              type="button"
+              onClick={() => toggle(s.dataKey)}
+              aria-pressed={enabled}
+              className={[
+                "sv-press inline-flex min-h-8 touch-manipulation items-center gap-1.5 rounded-full border px-2.5 py-1 font-semibold sm:min-h-0",
+                veryNarrow ? "text-[10px]" : "text-[11px]",
+                enabled
+                  ? "border-border bg-accent text-foreground"
+                  : "border-border/60 bg-background/60 text-muted-foreground opacity-60",
+              ].join(" ")}
+              style={{ fontFamily: "var(--sv-font-ui)" }}
+            >
+              {/* Cyan-graphs legend tick — vertical accent, not a floating dot */}
+              <span
+                aria-hidden
+                className="h-3 w-[3px] shrink-0 rounded-[2px]"
+                style={{ background: s.color, opacity: enabled ? 1 : 0.4 }}
+              />
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <ChartContainer
+        ref={hostRef}
+        config={chartConfig}
         className={[
-          "sv-chart-plot",
-          fill ? "w-full min-w-0 flex-1 min-h-0" : "w-full min-w-0 shrink-0",
+          "aspect-auto w-full min-w-0 overflow-visible",
+          fill ? "min-h-0 flex-1" : "shrink-0",
         ].join(" ")}
         style={
           fill
-            ? { width: "100%", minHeight: MIN_FILL_H, overflow: "visible" }
-            : {
-                width: "100%",
-                height: plotHeight,
-                minHeight: plotHeight,
-                overflow: "visible",
-              }
+            ? { minHeight: MIN_FILL_H }
+            : { height: fixedHeight, minHeight: fixedHeight }
         }
       >
-        {plotHeight > 0 && (
-          <ResponsiveContainer width="100%" height={plotHeight} debounce={50}>
-            <LineChart
-              data={data.chartData}
-              margin={chartMargin}
-            >
-              <CartesianGrid
-                strokeDasharray="1 5"
-                stroke="var(--sv-border)"
-                vertical={false}
-              />
-              <XAxis
-                dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tickMargin={embedded ? 6 : narrow ? 6 : 10}
-                interval={xInterval}
-                minTickGap={narrow ? 10 : 14}
-                height={showAxisTitles ? 36 : 22}
-                tick={{
-                  fill: "var(--sv-text-muted)",
-                  fontSize: tickFs,
-                  fontFamily: "var(--sv-font-ui)",
-                }}
-                label={
-                  showAxisTitles
-                    ? {
-                        value: data.xAxis || "Rounds",
-                        position: "insideBottom",
-                        offset: -2,
-                        fill: "var(--sv-text-muted)",
-                        fontSize: labelFs,
-                        fontFamily: "var(--sv-font-ui)",
-                      }
-                    : undefined
-                }
-              />
-              <YAxis
-                yAxisId="left"
-                axisLine={false}
-                tickLine={false}
-                tickMargin={6}
-                width={yTickWidth}
-                tickCount={5}
-                tick={{
-                  fill: "var(--sv-text-muted)",
-                  fontSize: tickFs,
-                  fontFamily: "var(--sv-font-ui)",
-                }}
-                domain={costsOnLeft ? costDomain : unitDomain}
-                allowDecimals={false}
-                tickFormatter={costsOnLeft ? formatCostTick : formatUnitTick}
-                label={
-                  showAxisTitles
-                    ? {
-                        value: costsOnLeft ? "Cost ($)" : "Units",
-                        angle: -90,
-                        position: "insideLeft",
-                        offset: 8,
-                        fill: "var(--sv-text-muted)",
-                        fontSize: labelFs,
-                        fontFamily: "var(--sv-font-ui)",
-                      }
-                    : undefined
-                }
-              />
-              {showCosts && !costsOnLeft && (
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  axisLine={false}
-                  tickLine={false}
-                  tickMargin={6}
-                  width={yRightWidth}
-                  tickCount={5}
-                  tick={{
-                    fill: "var(--sv-text-muted)",
-                    fontSize: tickFs,
-                    fontFamily: "var(--sv-font-ui)",
-                  }}
-                  domain={costDomain}
-                  allowDecimals={false}
-                  tickFormatter={formatCostTick}
-                  label={
-                    showAxisTitles
-                      ? {
-                          value: "Cost",
-                          angle: 90,
-                          position: "insideRight",
-                          offset: 8,
-                          fill: "var(--sv-text-muted)",
-                          fontSize: labelFs,
-                          fontFamily: "var(--sv-font-ui)",
-                        }
-                      : undefined
+        <LineChart data={data.chartData} margin={chartMargin}>
+          <CartesianGrid strokeDasharray="1 5" vertical={false} />
+          <XAxis
+            dataKey="name"
+            axisLine={false}
+            tickLine={false}
+            tickMargin={embedded || narrow ? 6 : 10}
+            interval={xInterval}
+            minTickGap={narrow ? 10 : 14}
+            height={showAxisTitles ? 36 : 22}
+            tick={axisTick}
+            label={
+              showAxisTitles
+                ? {
+                    value: data.xAxis || "Rounds",
+                    position: "insideBottom",
+                    offset: -2,
+                    ...axisLabelStyle,
                   }
-                />
-              )}
-              <Tooltip
-                cursor={{
-                  stroke: "var(--sv-border)",
-                  strokeWidth: 1,
-                  strokeDasharray: "3 3",
-                }}
-                formatter={formatTooltipValue}
-                labelFormatter={(label) => String(label)}
-                contentStyle={{
-                  backgroundColor:
-                    "color-mix(in srgb, var(--sv-card-solid) 96%, transparent)",
-                  border: "1px solid var(--sv-border)",
-                  borderRadius: 12,
-                  boxShadow: "0 6px 18px rgba(0, 44, 51, 0.1)",
-                  fontFamily: "var(--sv-font-ui)",
-                  fontSize: narrow ? 12 : 13,
-                  padding: "8px 12px",
-                }}
-                labelStyle={{
-                  color: "var(--sv-ink)",
-                  fontWeight: 700,
-                  marginBottom: 2,
-                }}
-                itemStyle={{
-                  color: "var(--sv-text)",
-                  fontWeight: 500,
-                  fontVariantNumeric: "tabular-nums",
+                : undefined
+            }
+          />
+          <YAxis
+            yAxisId="left"
+            axisLine={false}
+            tickLine={false}
+            tickMargin={6}
+            width={yTickWidth}
+            tickCount={5}
+            tick={axisTick}
+            domain={costsOnLeft ? costDomain : unitDomain}
+            allowDecimals={false}
+            tickFormatter={costsOnLeft ? formatCostTick : formatUnitTick}
+            label={
+              showYAxisTitles
+                ? {
+                    value: costsOnLeft ? "Cost ($)" : "Units",
+                    angle: -90,
+                    position: "insideLeft",
+                    offset: 8,
+                    ...axisLabelStyle,
+                  }
+                : undefined
+            }
+          />
+          {showRightAxis && (
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              axisLine={false}
+              tickLine={false}
+              tickMargin={6}
+              width={narrow ? 44 : 56}
+              tickCount={5}
+              tick={axisTick}
+              domain={costDomain}
+              allowDecimals={false}
+              tickFormatter={formatCostTick}
+              label={
+                showYAxisTitles
+                  ? {
+                      value: "Cost",
+                      angle: 90,
+                      position: "insideRight",
+                      offset: 8,
+                      ...axisLabelStyle,
+                    }
+                  : undefined
+              }
+            />
+          )}
+
+          <ChartTooltip
+            cursor={{ strokeWidth: 1, strokeDasharray: "3 3" }}
+            content={
+              <ChartTooltipContent
+                // "dot" keeps the round label on its own line even for
+                // single-series charts (shadcn nests it otherwise, and our
+                // custom row would swallow it). We draw our own indicator.
+                indicator="dot"
+                hideIndicator
+                formatter={(value, name) => {
+                  const s = allSeries.find((item) => item.slug === name);
+                  const n = typeof value === "number" ? value : Number(value);
+                  const text = !Number.isFinite(n)
+                    ? "—"
+                    : s?.cost
+                      ? `$${Math.round(n).toLocaleString()}`
+                      : String(Math.round(n));
+                  return (
+                    <>
+                      <span
+                        aria-hidden
+                        className="h-3 w-[3px] shrink-0 self-center rounded-[2px]"
+                        style={{ background: s?.color ?? "var(--sv-chart-1)" }}
+                      />
+                      <div className="flex flex-1 items-center justify-between gap-3 leading-none">
+                        <span className="text-muted-foreground">
+                          {s?.label ?? String(name)}
+                        </span>
+                        <span className="font-mono font-medium tabular-nums text-foreground">
+                          {text}
+                        </span>
+                      </div>
+                    </>
+                  );
                 }}
               />
+            }
+          />
 
-              {showOrders && (
-                <Line
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey="Orders"
-                  stroke="var(--sv-warning)"
-                  strokeWidth={2}
-                  isAnimationActive={false}
-                  dot={(props) => {
-                    const { key, ...rest } = props as {
-                      key?: string;
-                      cx?: number;
-                      cy?: number;
-                      payload?: { name?: string };
-                      index?: number;
-                    };
-                    return (
-                      <Dot
-                        key={key ?? `orders-${rest.payload?.name ?? rest.index}`}
-                        r={dotR}
-                        cx={rest.cx}
-                        cy={rest.cy}
-                        fill="var(--sv-warning)"
-                        stroke="var(--sv-card-solid)"
-                        strokeWidth={1.5}
-                      />
-                    );
-                  }}
-                />
-              )}
-
-              {showDemand && (
-                <Line
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey="Demand"
-                  stroke="var(--sv-chart-3)"
-                  strokeWidth={2}
-                  isAnimationActive={false}
-                  dot={(props) => {
-                    const { key, ...rest } = props as {
-                      key?: string;
-                      cx?: number;
-                      cy?: number;
-                      payload?: { name?: string };
-                      index?: number;
-                    };
-                    return (
-                      <Dot
-                        key={key ?? `demand-${rest.payload?.name ?? rest.index}`}
-                        r={dotR}
-                        cx={rest.cx}
-                        cy={rest.cy}
-                        fill="var(--sv-chart-3)"
-                        stroke="var(--sv-card-solid)"
-                        strokeWidth={1.5}
-                      />
-                    );
-                  }}
-                />
-              )}
-
-              {showDelivery && (
-                <Line
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey="Delivery"
-                  stroke="var(--sv-positive)"
-                  strokeWidth={2}
-                  isAnimationActive={false}
-                  dot={(props) => {
-                    const { key, ...rest } = props as {
-                      key?: string;
-                      cx?: number;
-                      cy?: number;
-                      payload?: { name?: string };
-                      index?: number;
-                    };
-                    return (
-                      <Dot
-                        key={key ?? `delivery-${rest.payload?.name ?? rest.index}`}
-                        r={dotR}
-                        cx={rest.cx}
-                        cy={rest.cy}
-                        fill="var(--sv-positive)"
-                        stroke="var(--sv-card-solid)"
-                        strokeWidth={1.5}
-                      />
-                    );
-                  }}
-                />
-              )}
-
-              {showStock && (
-                <Line
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey={stockKey}
-                  stroke="var(--sv-cyan)"
-                  strokeWidth={2}
-                  isAnimationActive={false}
-                  dot={(props) => {
-                    const { key, ...rest } = props as {
-                      key?: string;
-                      cx?: number;
-                      cy?: number;
-                      payload?: { name?: string };
-                      index?: number;
-                    };
-                    return (
-                      <Dot
-                        key={key ?? `stock-${rest.payload?.name ?? rest.index}`}
-                        r={dotR}
-                        cx={rest.cx}
-                        cy={rest.cy}
-                        fill="var(--sv-cyan)"
-                        stroke="var(--sv-card-solid)"
-                        strokeWidth={1.5}
-                      />
-                    );
-                  }}
-                />
-              )}
-
-              {showBacklog && (
-                <Line
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey="Backlog"
-                  stroke="var(--sv-ink)"
-                  strokeWidth={2}
-                  isAnimationActive={false}
-                  dot={(props) => {
-                    const { key, ...rest } = props as {
-                      key?: string;
-                      cx?: number;
-                      cy?: number;
-                      payload?: { name?: string };
-                      index?: number;
-                    };
-                    return (
-                      <Dot
-                        key={key ?? `backlog-${rest.payload?.name ?? rest.index}`}
-                        r={dotR}
-                        cx={rest.cx}
-                        cy={rest.cy}
-                        fill="var(--sv-ink)"
-                        stroke="var(--sv-card-solid)"
-                        strokeWidth={1.5}
-                      />
-                    );
-                  }}
-                />
-              )}
-
-              {(() => {
-                const totalCostKey = data.yAxis?.find(
-                  (y) =>
-                    y.toLowerCase() === "total cost" ||
-                    y.toLowerCase() === "costs" ||
-                    y.toLowerCase() === "totalcost",
-                );
-                if (!totalCostKey || !isMetricEnabled(totalCostKey)) return null;
-
-                return (
-                  <Line
-                    yAxisId={costsOnLeft ? "left" : "right"}
-                    type="monotone"
-                    dataKey={totalCostKey}
-                    stroke="var(--sv-teal-mid)"
-                    strokeWidth={2}
-                    isAnimationActive={false}
-                    dot={(props) => {
-                      const { key, ...rest } = props as {
-                        key?: string;
-                        cx?: number;
-                        cy?: number;
-                        payload?: { name?: string };
-                        index?: number;
-                      };
-                      return (
-                        <Dot
-                          key={key ?? `cost-${rest.payload?.name ?? rest.index}`}
-                          r={dotR}
-                          cx={rest.cx}
-                          cy={rest.cy}
-                          fill="var(--sv-teal-mid)"
-                          stroke="var(--sv-card-solid)"
-                          strokeWidth={1.5}
-                        />
-                      );
-                    }}
-                  />
-                );
-              })()}
-            </LineChart>
-          </ResponsiveContainer>
-        )}
-      </div>
+          {active.map((s) => (
+            <Line
+              key={s.slug}
+              yAxisId={s.cost && !costsOnLeft ? "right" : "left"}
+              name={s.slug}
+              type="monotone"
+              dataKey={s.dataKey}
+              stroke={`var(--color-${s.slug})`}
+              strokeWidth={2}
+              isAnimationActive={false}
+              dot={{
+                r: dotR,
+                fill: `var(--color-${s.slug})`,
+                stroke: "var(--sv-card-solid)",
+                strokeWidth: 1.5,
+              }}
+              activeDot={{ r: dotR + 1.5 }}
+            />
+          ))}
+        </LineChart>
+      </ChartContainer>
     </div>
   );
 }

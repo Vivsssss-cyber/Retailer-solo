@@ -1,10 +1,12 @@
-import { NextResponse } from "next/server";
+import { getAdminPin, isAdminPinConfigured } from "@/server/adminSecret";
 import {
-  adminSessionCookieHeader,
-  attemptAdminLogin,
-} from "@/server/adminAuth";
+  adminSessionCookieValue,
+  createAdminSession,
+  safeEqualString,
+} from "@/server/adminSession";
 import { ApiError } from "@/server/errors";
-import { jsonError, parseJson } from "@/server/http";
+import { jsonError, jsonOk, parseJson } from "@/server/http";
+import { assertRateLimit, clientIpFromRequest } from "@/server/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -12,40 +14,36 @@ interface LoginBody {
   pin?: string;
 }
 
+/**
+ * Exchange admin PIN for httpOnly session cookie.
+ * PIN never needs to live in the client bundle after login.
+ */
 export async function POST(request: Request) {
   try {
-    const body = await parseJson<LoginBody>(request);
-    const pin = typeof body?.pin === "string" ? body.pin : "";
-    if (!pin.trim()) {
-      throw new ApiError("BAD_REQUEST", "PIN is required");
-    }
-
-    const result = attemptAdminLogin(request, pin);
-    if (!result.ok) {
-      if (result.reason === "rate_limited") {
-        throw new ApiError(
-          "RATE_LIMITED",
-          `Too many login attempts. Retry in ${result.retryAfterSec ?? 60}s`,
-          429,
-        );
-      }
-      if (result.reason === "not_configured") {
-        throw new ApiError(
-          "UNAUTHORIZED",
-          "Admin PIN is not configured on the server (set ADMIN_PIN)",
-          401,
-        );
-      }
-      throw new ApiError("UNAUTHORIZED", "Incorrect PIN", 401);
-    }
-
-    return new NextResponse(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Set-Cookie": adminSessionCookieHeader(result.token),
-      },
+    assertRateLimit({
+      key: `admin-login:${clientIpFromRequest(request)}`,
+      limit: 10,
+      windowMs: 60_000,
     });
+
+    if (!isAdminPinConfigured()) {
+      throw new ApiError(
+        "BAD_REQUEST",
+        "Admin PIN is not configured on the server (set ADMIN_PIN).",
+        503,
+      );
+    }
+
+    const body = await parseJson<LoginBody>(request);
+    const pin = body?.pin?.trim() ?? "";
+    if (!pin || !safeEqualString(pin, getAdminPin())) {
+      throw new ApiError("BAD_REQUEST", "Incorrect admin PIN", 401);
+    }
+
+    const token = createAdminSession();
+    const res = jsonOk({ ok: true as const });
+    res.headers.set("Set-Cookie", adminSessionCookieValue(token));
+    return res;
   } catch (err) {
     return jsonError(err);
   }

@@ -127,15 +127,9 @@ export default function AdminDataPage() {
             size="sm"
             variant="outline"
             onClick={() => {
-              void (async () => {
-                lockAdmin();
-                try {
-                  await api.adminLogout();
-                } catch {
-                  /* ignore — local flag already cleared */
-                }
-                window.location.href = "/admin";
-              })();
+              lockAdmin();
+              if (!USE_MOCK) void api.adminLogout();
+              window.location.href = "/admin";
             }}
           >
             Lock admin

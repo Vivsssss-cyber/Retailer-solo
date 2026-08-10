@@ -23,13 +23,14 @@ import { loadAdminConfig } from "@/lib/adminConfigStore";
 import { api, USE_MOCK } from "@/services/api";
 import {
   PERSONA_AVATAR_PLACEHOLDER,
-  PERSONAS,
   personaBySlug,
+  type CoachExpression,
   type PersonaSlug,
 } from "@/lib/personas";
 import { readPlayerProfile, writePlayerProfile } from "@/lib/playerProfile";
 import { CoachSpeech } from "@/components/coach";
 import { OnboardingWarehouseTour } from "@/components/onboarding/OnboardingWarehouseTour";
+import { PersonaPicker } from "@/components/onboarding/PersonaPicker";
 import { hasCompletedPlayTour } from "@/lib/playTour";
 
 // ---------------------------------------------------------
@@ -51,6 +52,20 @@ const COACH_LINES: Record<string, string> = {
     "Last chance. Official cannot be undone for this email on this heat.",
   tutorial: "I'll spotlight the warehouse — inventory, history, charts, and your order dock.",
   loading: "Locking in your setup. Warehouse opens in a second…",
+};
+
+/** Pose per onboarding beat — matches message intent, not just tip/warn tones. */
+const COACH_EXPRESSIONS_BY_STEP: Record<string, CoachExpression> = {
+  welcome: "neutral",
+  mode: "explain",
+  practiceFast: "explain",
+  identity: "explain",
+  heatCode: "thinking",
+  hostShare: "explain",
+  official: "thinking",
+  officialConfirm: "alert",
+  tutorial: "explain",
+  loading: "thinking",
 };
 
 type PlayMode = "solo" | "host" | "heat";
@@ -415,88 +430,11 @@ function PracticeFastScreen({
       >
         Avatar
       </span>
-      <div
-        role="radiogroup"
-        aria-label="Choose a persona avatar"
-        className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6"
-        onMouseLeave={() => onHoverPersona?.(null)}
-      >
-        {PERSONAS.map((p) => {
-          const active = persona === p.slug;
-          return (
-            <button
-              key={p.slug}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              aria-label={p.name}
-              onClick={() => onPersonaChange(p.slug)}
-              onPointerDown={(e) => {
-                // Instant select on press (no double-tap feel on touch).
-                if (e.pointerType === "touch" || e.pointerType === "pen") {
-                  onPersonaChange(p.slug);
-                }
-              }}
-              onMouseEnter={() => onHoverPersona?.(p.slug)}
-              onFocus={() => onHoverPersona?.(p.slug)}
-              className="touch-manipulation select-none"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 10,
-                borderRadius: 14,
-                border: active
-                  ? "2.5px solid var(--sv-teal-mid)"
-                  : "1.5px solid var(--sv-border)",
-                background: active ? "var(--sv-cyan-tint)" : "rgba(255,255,255,0.7)",
-                cursor: "pointer",
-                // Only animate inactive hover — active state is instant
-                transition: active
-                  ? "none"
-                  : "border-color 0.12s ease, background 0.12s ease",
-                boxShadow: active
-                  ? "0 0 0 3px color-mix(in srgb, var(--sv-teal-mid) 22%, transparent)"
-                  : "none",
-                transform: active ? "scale(1.02)" : "scale(1)",
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >
-              <span
-                style={{
-                  width: 108,
-                  height: 108,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  overflow: "hidden",
-                  borderRadius: 12,
-                  background: "transparent",
-                  pointerEvents: "none",
-                }}
-              >
-                <Image
-                  src={p.avatarSrc}
-                  alt=""
-                  width={108}
-                  height={108}
-                  unoptimized
-                  draggable={false}
-                  style={{
-                    width: 108,
-                    height: 108,
-                    objectFit: "contain",
-                    imageRendering: "pixelated",
-                  }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = PERSONA_AVATAR_PLACEHOLDER;
-                  }}
-                />
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <PersonaPicker
+        value={persona}
+        onChange={onPersonaChange}
+        onHover={onHoverPersona}
+      />
 
       <label
         htmlFor="practice-name"
@@ -536,7 +474,7 @@ function PracticeFastScreen({
         }}
       />
 
-      {selected && name.trim() && (
+      {selected && (
         <div
           style={{
             display: "flex",
@@ -549,17 +487,20 @@ function PracticeFastScreen({
             background: "rgba(255,255,255,0.6)",
           }}
         >
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src={selected.avatarSrc}
             alt=""
             width={40}
             height={40}
-            unoptimized
             style={{
               width: 40,
               height: 40,
               objectFit: "contain",
               imageRendering: "pixelated",
+            }}
+            onError={(e) => {
+              e.currentTarget.src = PERSONA_AVATAR_PLACEHOLDER;
             }}
           />
           <div className="min-w-0">
@@ -573,7 +514,7 @@ function PracticeFastScreen({
               }}
               className="truncate"
             >
-              {name.trim()}
+              {name.trim() || "Add a display name"}
             </p>
             <p
               style={{
@@ -583,7 +524,7 @@ function PracticeFastScreen({
                 margin: 0,
               }}
             >
-              Board label only
+              {selected.name} · board only
             </p>
           </div>
         </div>
@@ -672,86 +613,11 @@ function IdentityScreen({
       >
         Avatar
       </span>
-      <div
-        role="radiogroup"
-        aria-label="Choose a persona avatar"
-        className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6"
-        onMouseLeave={() => onHoverPersona?.(null)}
-      >
-        {PERSONAS.map((p) => {
-          const active = persona === p.slug;
-          return (
-            <button
-              key={p.slug}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              aria-label={p.name}
-              onClick={() => onPersonaChange(p.slug)}
-              onPointerDown={(e) => {
-                if (e.pointerType === "touch" || e.pointerType === "pen") {
-                  onPersonaChange(p.slug);
-                }
-              }}
-              onMouseEnter={() => onHoverPersona?.(p.slug)}
-              onFocus={() => onHoverPersona?.(p.slug)}
-              className="touch-manipulation select-none"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 10,
-                borderRadius: 14,
-                border: active
-                  ? "2.5px solid var(--sv-teal-mid)"
-                  : "1.5px solid var(--sv-border)",
-                background: active ? "var(--sv-cyan-tint)" : "rgba(255,255,255,0.7)",
-                cursor: "pointer",
-                transition: active
-                  ? "none"
-                  : "border-color 0.12s ease, background 0.12s ease",
-                boxShadow: active
-                  ? "0 0 0 3px color-mix(in srgb, var(--sv-teal-mid) 22%, transparent)"
-                  : "none",
-                transform: active ? "scale(1.02)" : "scale(1)",
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >
-              <span
-                style={{
-                  width: 108,
-                  height: 108,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  overflow: "hidden",
-                  borderRadius: 12,
-                  background: "transparent",
-                  pointerEvents: "none",
-                }}
-              >
-                <Image
-                  src={p.avatarSrc}
-                  alt=""
-                  width={108}
-                  height={108}
-                  unoptimized
-                  draggable={false}
-                  style={{
-                    width: 108,
-                    height: 108,
-                    objectFit: "contain",
-                    imageRendering: "pixelated",
-                  }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = PERSONA_AVATAR_PLACEHOLDER;
-                  }}
-                />
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <PersonaPicker
+        value={persona}
+        onChange={onPersonaChange}
+        onHover={onHoverPersona}
+      />
 
       <label
         htmlFor="player-name"
@@ -791,7 +657,7 @@ function IdentityScreen({
         }}
       />
 
-      {selected && name.trim() && (
+      {selected && (
         <div
           style={{
             display: "flex",
@@ -804,17 +670,20 @@ function IdentityScreen({
             background: "rgba(255,255,255,0.6)",
           }}
         >
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src={selected.avatarSrc}
             alt=""
             width={40}
             height={40}
-            unoptimized
             style={{
               width: 40,
               height: 40,
               objectFit: "contain",
               imageRendering: "pixelated",
+            }}
+            onError={(e) => {
+              e.currentTarget.src = PERSONA_AVATAR_PLACEHOLDER;
             }}
           />
           <div className="min-w-0">
@@ -828,7 +697,7 @@ function IdentityScreen({
               }}
               className="truncate"
             >
-              {name.trim()}
+              {name.trim() || "Add a display name"}
             </p>
             <p
               style={{
@@ -838,7 +707,7 @@ function IdentityScreen({
                 margin: 0,
               }}
             >
-              Board label only
+              {selected.name} · board only
             </p>
           </div>
         </div>
@@ -889,7 +758,7 @@ function HeatCodeScreen({
         autoFocus
         value={value}
         onChange={(e) => onChange(e.target.value.toUpperCase())}
-        placeholder="e.g. ABC123"
+        placeholder="e.g. ABCD2345"
         style={{
           width: "100%",
           fontFamily: FO,
@@ -943,7 +812,10 @@ function HostShareScreen({
   const createOnceRef = useRef(false);
 
   useEffect(() => {
-    setOrigin(window.location.origin);
+    const id = window.requestAnimationFrame(() => {
+      setOrigin(window.location.origin);
+    });
+    return () => window.cancelAnimationFrame(id);
   }, []);
 
   useEffect(() => {
@@ -1485,7 +1357,11 @@ export default function OnboardingFlow() {
   const [tutorialGate, setTutorialGate] = useState<"needed" | "skip">("skip");
 
   useEffect(() => {
-    if (!hasCompletedPlayTour()) setTutorialGate("needed");
+    // Defer past hydrate so progress-bar width matches SSR first paint.
+    const id = window.requestAnimationFrame(() => {
+      if (!hasCompletedPlayTour()) setTutorialGate("needed");
+    });
+    return () => window.cancelAnimationFrame(id);
   }, []);
 
   useEffect(() => {
@@ -1510,27 +1386,14 @@ export default function OnboardingFlow() {
     };
   }, []);
 
-  const [data, setData] = useState(() => {
-    if (typeof window === "undefined") {
-      return {
-        persona: "" as PersonaSlug | "",
-        name: "",
-        mode: "solo" as PlayMode,
-        heatCode: "",
-        isOfficial: false,
-        playerIdentity: "",
-      };
-    }
-    const profile = readPlayerProfile();
-    const code = readQueryHeatCode();
-    return {
-      persona: (profile.persona ?? "") as PersonaSlug | "",
-      name: profile.name ?? "",
-      mode: (code ? "heat" : "solo") as PlayMode,
-      heatCode: code,
-      isOfficial: false,
-      playerIdentity: readSavedIdentity(),
-    };
+  // Empty defaults for SSR/hydrate parity; hydrate from storage + ?code= after mount.
+  const [data, setData] = useState({
+    persona: "" as PersonaSlug | "",
+    name: "",
+    mode: "solo" as PlayMode,
+    heatCode: "",
+    isOfficial: false,
+    playerIdentity: "",
   });
 
   // welcome(0) → mode(1) → identity(2) when joining via QR/link
@@ -1538,25 +1401,45 @@ export default function OnboardingFlow() {
   const [stepIndex, setStepIndex] = useState(0);
 
   useEffect(() => {
-    if (readQueryHeatCode()) setStepIndex(2);
+    const id = window.requestAnimationFrame(() => {
+      const profile = readPlayerProfile();
+      const code = readQueryHeatCode();
+      setData((prev) => ({
+        ...prev,
+        persona: (profile.persona ?? prev.persona) as PersonaSlug | "",
+        name: profile.name ?? prev.name,
+        mode: code ? "heat" : prev.mode,
+        heatCode: code || prev.heatCode,
+        playerIdentity: readSavedIdentity() || prev.playerIdentity,
+      }));
+      if (code) setStepIndex(2);
+    });
+    return () => window.cancelAnimationFrame(id);
   }, []);
 
   const updateData = <K extends keyof typeof data>(key: K, val: (typeof data)[K]) => {
     setData((prev) => {
       const next = { ...prev, [key]: val };
       if (key === "mode" && val === "solo") next.isOfficial = false;
+
+      // Persist persona/name from the *next* state (avoid stale closures wiping fields).
+      if (key === "persona" || key === "name") {
+        const nextPersona = next.persona;
+        const nextName = next.name.trim();
+        if (nextPersona || nextName) {
+          writePlayerProfile({
+            persona: nextPersona || null,
+            // Only clear name when the user explicitly edits the name field to empty.
+            name:
+              key === "name"
+                ? nextName || null
+                : nextName || readPlayerProfile().name,
+          });
+        }
+      }
+
       return next;
     });
-    if (key === "persona" || key === "name") {
-      const nextPersona = key === "persona" ? (val as PersonaSlug | "") : data.persona;
-      const nextName = key === "name" ? String(val) : data.name;
-      if (nextPersona || nextName.trim()) {
-        writePlayerProfile({
-          persona: nextPersona || null,
-          name: nextName.trim() || null,
-        });
-      }
-    }
     if (key === "playerIdentity") {
       saveIdentity(String(val).trim());
     }
@@ -1809,6 +1692,15 @@ export default function OnboardingFlow() {
     return COACH_LINES[stepId] ?? COACH_LINES.welcome;
   }, [stepId, hoverPersona, data.persona]);
 
+  const coachExpression = useMemo((): CoachExpression => {
+    // Persona pick feedback — coach reacts to the choice.
+    if (stepId === "identity" || stepId === "practiceFast") {
+      if (hoverPersona || data.persona) return "celebrate";
+      return "explain";
+    }
+    return COACH_EXPRESSIONS_BY_STEP[stepId] ?? "neutral";
+  }, [stepId, hoverPersona, data.persona]);
+
   // Warehouse tour has its own coach + dark overlay — hide side mascot.
   const showCoach = stepId !== "loading" && stepId !== "tutorial";
 
@@ -1897,7 +1789,19 @@ export default function OnboardingFlow() {
 
           {showCoach && (
             <div className="flex w-full max-w-full justify-center self-center order-first px-1 sm:px-0 sm:max-w-none lg:order-none lg:w-auto lg:justify-end">
-              <CoachSpeech line={coachLine} messageKey={stepId} size="lg" />
+              <CoachSpeech
+                line={coachLine}
+                messageKey={`${stepId}-${coachExpression}`}
+                expression={coachExpression}
+                tone={
+                  coachExpression === "alert"
+                    ? "danger"
+                    : coachExpression === "celebrate"
+                      ? "ok"
+                      : "tip"
+                }
+                size="lg"
+              />
             </div>
           )}
         </div>
