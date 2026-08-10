@@ -367,14 +367,8 @@ export const mockAdapter: RetailerChallengeApi = {
 
     const isOfficial = body.is_official === true;
     let identity = body.player_identity?.trim() || null;
-    if (isOfficial) {
-      if (!identity) {
-        throw errorWithCode(
-          "BAD_REQUEST",
-          "Official attempts require an email or player ID",
-        );
-      }
-      identity = identity.toLowerCase();
+    if (identity) identity = identity.toLowerCase();
+    if (isOfficial && identity) {
       const dup = active.find(
         (a) =>
           a.is_official &&

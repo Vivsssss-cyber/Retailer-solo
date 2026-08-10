@@ -113,14 +113,13 @@ describe("heat + attempt lifecycle", () => {
     ).rejects.toMatchObject({ code: "ALREADY_ATTEMPTED" });
   });
 
-  it("rejects official attempt without identity", async () => {
+  it("allows official attempt without identity (QR/access-code join)", async () => {
     const heat = await createHeat({ solo: false });
-    await expect(
-      createAttempt(heat.heat_id, {
-        player_name: "Ava",
-        is_official: true,
-      }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    const { attempt } = await createAttempt(heat.heat_id, {
+      player_name: "Ava",
+      is_official: true,
+    });
+    expect(attempt.player_name).toBe("Ava");
   });
 
   it("canonicalizes official identity case", async () => {
