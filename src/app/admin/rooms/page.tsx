@@ -68,8 +68,8 @@ export default function AdminRoomsPage() {
 
   return (
     <AdminShell
-      title="Rooms"
-      subtitle="Create a room, share the join link. Players open /join/CODE — you stay here as facilitator."
+      title="Groups"
+      subtitle="Create a group, share the join link. Players open /join/CODE — you stay here as facilitator."
       actions={
         <>
           <GameButton
@@ -87,7 +87,7 @@ export default function AdminRoomsPage() {
             onClick={() => void handleCreate()}
             disabled={creating}
           >
-            {creating ? "Creating…" : "Create room"}
+            {creating ? "Creating…" : "Create group"}
           </GameButton>
         </>
       }
@@ -122,13 +122,13 @@ export default function AdminRoomsPage() {
         </p>
       )}
 
-      <AdminSection title="Open & recent rooms">
+      <AdminSection title="Open & recent groups">
         {loading && (
           <p style={{ fontFamily: FO, color: "var(--sv-text-muted)" }}>Loading…</p>
         )}
         {!loading && heats.length === 0 && (
           <p style={{ fontFamily: FO, color: "var(--sv-text-muted)" }}>
-            No rooms yet. Create one, then share the join link with your class.
+            No groups yet. Create one, then share the join link with your class.
           </p>
         )}
         {!loading && heats.length > 0 && (

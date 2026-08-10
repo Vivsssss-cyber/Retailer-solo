@@ -16,7 +16,11 @@ import {
   type LeaderboardRow,
   type RoundRecord,
 } from "@/engine";
-import { loadAdminConfig, saveAdminConfig } from "@/lib/adminConfigStore";
+import {
+  isAdminUnlocked,
+  loadAdminConfig,
+  saveAdminConfig,
+} from "@/lib/adminConfigStore";
 import { persistPlayerToken, readPlayerToken } from "@/lib/playerTokenStore";
 import type {
   AdminCreateRoomRequest,
@@ -268,10 +272,23 @@ export const mockAdapter: RetailerChallengeApi = {
   },
 
   async createHeat(body: CreateHeatRequest): Promise<CreateHeatResponse> {
-    // Player-facing create is solo-only. Multiplayer rooms use adminCreateRoom.
+    // Player-facing create is solo-only. Multiplayer groups use adminCreateRoom.
     const solo = body.solo === true;
     const store = load();
     const configuration = activeConfig();
+    if (solo) {
+      if (!configuration.solo_practice_enabled) {
+        throw errorWithCode(
+          "BAD_REQUEST",
+          "Solo practice is turned off. Join a group with the access code from your host.",
+        );
+      }
+    } else if (!isAdminUnlocked()) {
+      throw errorWithCode(
+        "UNAUTHORIZED",
+        "Only an unlocked admin can create a classroom group.",
+      );
+    }
     const heat_id = id("heat");
     const access_code = solo ? `SOLO-${code(6)}` : code(8);
     store.heats[heat_id] = {

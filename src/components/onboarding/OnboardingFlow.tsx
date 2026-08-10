@@ -38,15 +38,15 @@ import { hasCompletedPlayTour } from "@/lib/playTour";
 
 const COACH_LINES: Record<string, string> = {
   welcome: "I'm your coach. Before we open the warehouse — let's get you set up.",
-  mode: "Solo practice is the fastest path. Join a room when your facilitator shares a code.",
+  mode: "Join a group with the code from your instructor. Solo practice only if they enabled it.",
   practiceFast: "Pick a face and a name — cosmetic only. Then we open the warehouse.",
   identity:
     "Avatar and name are cosmetic only — they never change scoring or fairness.",
-  heatCode: "Ask your facilitator for the room code. We'll take you to the join page.",
+  heatCode: "Enter the group code. You can add your name on the next screen.",
   official:
-    "Official is one attempt per email — permanent for this heat. Practice is unlimited.",
+    "Official is one attempt per email — permanent for this group. Practice is unlimited.",
   officialConfirm:
-    "Last chance. Official cannot be undone for this email on this heat.",
+    "Last chance. Official cannot be undone for this email on this group.",
   tutorial: "I'll spotlight the warehouse — inventory, history, charts, and your order dock.",
   loading: "Locking in your setup. Warehouse opens in a second…",
 };
@@ -239,10 +239,12 @@ function ModeScreen({
   value,
   onChange,
   onNext,
+  soloEnabled,
 }: {
   value: PlayMode;
   onChange: (v: PlayMode) => void;
   onNext: () => void;
+  soloEnabled: boolean;
 }) {
   const options: {
     id: PlayMode;
@@ -251,18 +253,20 @@ function ModeScreen({
     icon: React.ReactNode;
   }[] = [
     {
-      id: "solo",
-      title: "Solo Practice",
-      blurb: "Fastest path — name, coach walkthrough, play.",
-      icon: <Target size={20} color="currentColor" />,
-    },
-    {
       id: "heat",
-      title: "Join a Room",
+      title: "Join a Group",
       blurb: "Enter a code from your facilitator (or open their join link).",
       icon: <Package size={20} color="currentColor" />,
     },
   ];
+  if (soloEnabled) {
+    options.push({
+      id: "solo",
+      title: "Solo Practice",
+      blurb: "Private practice — not ranked with a classroom group.",
+      icon: <Target size={20} color="currentColor" />,
+    });
+  }
 
   return (
     <GlassCard className="p-4">
@@ -701,7 +705,7 @@ function HeatCodeScreen({
           marginBottom: 8,
         }}
       >
-        Enter Room Code
+        Enter group code
       </h2>
       <p
         style={{
@@ -711,7 +715,8 @@ function HeatCodeScreen({
           marginBottom: 24,
         }}
       >
-        Ask your facilitator for the room code, or open the join link they shared.
+        Ask your facilitator for the group code, or open the join link they shared. You can
+        add your name after you join.
       </p>
       <input
         autoFocus
@@ -823,9 +828,10 @@ function LoadingScreen({
 
 // ---------------------------------------------------------
 // Main flow
-// Welcome → Mode →
+// Welcome → [Mode if solo practice enabled] →
 //   solo: PracticeFast → [Tutorial?] → Loading
-//   heat: HeatCode → redirects to /join/[code]
+//   group: GroupCode → redirects to /join/[code] (name optional there)
+// Groups are admin-created only.
 // ---------------------------------------------------------
 
 export default function OnboardingFlow() {
@@ -840,6 +846,8 @@ export default function OnboardingFlow() {
    * promote to "needed" after mount when tour not yet completed.
    */
   const [tutorialGate, setTutorialGate] = useState<"needed" | "skip">("skip");
+
+  const soloPracticeEnabled = gameConfig.solo_practice_enabled === true;
 
   useEffect(() => {
     // Defer past hydrate so progress-bar width matches SSR first paint.
@@ -872,10 +880,11 @@ export default function OnboardingFlow() {
   }, []);
 
   // Empty defaults for SSR/hydrate parity; hydrate from storage after mount.
+  // Default: join group. Solo only when admin enables it.
   const [data, setData] = useState({
     persona: "" as PersonaSlug | "",
     name: "",
-    mode: "solo" as PlayMode,
+    mode: "heat" as PlayMode,
     heatCode: "",
   });
 
@@ -884,14 +893,22 @@ export default function OnboardingFlow() {
   useEffect(() => {
     const id = window.requestAnimationFrame(() => {
       const profile = readPlayerProfile();
+      const soloOn = loadAdminConfig().solo_practice_enabled === true;
       setData((prev) => ({
         ...prev,
         persona: (profile.persona ?? prev.persona) as PersonaSlug | "",
         name: profile.name ?? prev.name,
+        mode: soloOn ? prev.mode : "heat",
       }));
     });
     return () => window.cancelAnimationFrame(id);
   }, []);
+
+  useEffect(() => {
+    if (!soloPracticeEnabled && data.mode === "solo") {
+      setData((prev) => ({ ...prev, mode: "heat" }));
+    }
+  }, [soloPracticeEnabled, data.mode]);
 
   const updateData = <K extends keyof typeof data>(key: K, val: (typeof data)[K]) => {
     setData((prev) => {
@@ -940,6 +957,10 @@ export default function OnboardingFlow() {
   };
 
   const runStart = async () => {
+    if (!soloPracticeEnabled) {
+      setData((prev) => ({ ...prev, mode: "heat" }));
+      return;
+    }
     const player = ensurePracticeProfile();
     try {
       const id = await startSolo(player);
@@ -953,24 +974,31 @@ export default function OnboardingFlow() {
   const goToPlayOrTutorial = () => next();
 
   const showTutorial = tutorialGate === "needed";
+  const showModeScreen = soloPracticeEnabled;
+  const effectiveMode: PlayMode =
+    soloPracticeEnabled && data.mode === "solo" ? "solo" : "heat";
 
   const allScreens = useMemo(() => {
     type Screen = { id: string; component: React.ReactNode };
     const screens: Screen[] = [
       { id: "welcome", component: <WelcomeScreen config={gameConfig} onNext={next} /> },
-      {
+    ];
+
+    if (showModeScreen) {
+      screens.push({
         id: "mode",
         component: (
           <ModeScreen
-            value={data.mode}
+            value={effectiveMode}
             onChange={(v) => updateData("mode", v)}
             onNext={next}
+            soloEnabled={soloPracticeEnabled}
           />
         ),
-      },
-    ];
+      });
+    }
 
-    if (data.mode === "solo") {
+    if (effectiveMode === "solo") {
       screens.push({
         id: "practiceFast",
         component: (
@@ -1017,7 +1045,7 @@ export default function OnboardingFlow() {
         ),
       });
     } else {
-      // Join a room: enter code → dedicated /join/[code] page
+      // Join a group: enter code → /join/[code] (name optional there)
       screens.push({
         id: "heatCode",
         component: (
@@ -1035,7 +1063,9 @@ export default function OnboardingFlow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuild when flow inputs change
   }, [
     gameConfig,
-    data.mode,
+    effectiveMode,
+    showModeScreen,
+    soloPracticeEnabled,
     data.name,
     data.persona,
     data.heatCode,

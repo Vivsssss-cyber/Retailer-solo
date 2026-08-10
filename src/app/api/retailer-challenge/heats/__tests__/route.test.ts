@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { DEFAULT_CONFIG } from "@/engine";
 import { getAdminPin } from "@/server/adminSecret";
+import { upsertConfiguration } from "@/server/service";
 import { resetStoreForTests } from "@/server/store";
 import { POST } from "../route";
 
@@ -20,8 +22,21 @@ function post(body: unknown, headers?: Record<string, string>) {
   );
 }
 
+async function enableSoloPractice() {
+  await upsertConfiguration(
+    { ...DEFAULT_CONFIG, solo_practice_enabled: true },
+    { makeDefault: true },
+  );
+}
+
 describe("POST /heats authorization", () => {
-  it("allows solo create without pin", async () => {
+  it("rejects solo create when solo practice is disabled (default)", async () => {
+    const res = await post({ solo: true, player_name: "Ava" });
+    expect(res.status).toBe(403);
+  });
+
+  it("allows solo create without pin when solo practice is enabled", async () => {
+    await enableSoloPractice();
     const res = await post({ solo: true, player_name: "Ava" });
     expect(res.status).toBe(201);
     const json = (await res.json()) as { access_code: string };

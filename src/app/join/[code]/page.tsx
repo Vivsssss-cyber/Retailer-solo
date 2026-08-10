@@ -18,8 +18,8 @@ import { readPlayerProfile, writePlayerProfile } from "@/lib/playerProfile";
 import { normalizeHeatKey } from "@/lib/heatKey";
 
 /**
- * Player join entry: /join/ABC123 → name → practice attempt → /play/[id].
- * Phase 1: no official mode on this path (practice joins only).
+ * Player join entry: /join/ABC123 → optional name → practice attempt → /play/[id].
+ * Name can be skipped (defaults to "Player"). Phase 1: practice joins only.
  */
 export default function JoinRoomPage() {
   const params = useParams();
@@ -37,7 +37,7 @@ export default function JoinRoomPage() {
 
   const loadHeat = useCallback(async () => {
     if (!code) {
-      setLoadError("Missing room code.");
+      setLoadError("Missing group code.");
       setLoading(false);
       return;
     }
@@ -47,10 +47,10 @@ export default function JoinRoomPage() {
       const summary = await api.getHeat(code);
       setHeat(summary);
       if (summary.status === "closed") {
-        setLoadError("This room is closed. Ask your facilitator for a new link.");
+        setLoadError("This group is closed. Ask your facilitator for a new link.");
       } else if (summary.attempt_count >= summary.max_players) {
         setLoadError(
-          `This room is full (${summary.max_players} players). Ask for a new room.`,
+          `This group is full (${summary.max_players} players). Ask for a new group.`,
         );
       }
     } catch (e) {
@@ -111,7 +111,7 @@ export default function JoinRoomPage() {
                 marginBottom: 6,
               }}
             >
-              Join room
+              Join group
             </p>
             <h1
               style={{
@@ -141,14 +141,14 @@ export default function JoinRoomPage() {
                   lineHeight: 1.4,
                 }}
               >
-                Mock mode: rooms only exist in this browser. Classroom play needs{" "}
+                Mock mode: groups only exist in this browser. Classroom play needs{" "}
                 <code style={{ fontSize: 11 }}>NEXT_PUBLIC_USE_MOCK=false</code>.
               </p>
             )}
 
             {loading && (
               <p style={{ fontFamily: FO, color: "var(--sv-text-muted)" }}>
-                Checking room…
+                Checking group…
               </p>
             )}
 
@@ -184,6 +184,18 @@ export default function JoinRoomPage() {
 
             {canJoin && (
               <>
+                <p
+                  style={{
+                    fontFamily: FO,
+                    fontSize: 13,
+                    color: "var(--sv-text-secondary)",
+                    marginBottom: 12,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  You&apos;re in the group. Add a display name now or skip and join as
+                  Player.
+                </p>
                 <label
                   htmlFor="join-name"
                   style={{
@@ -195,14 +207,14 @@ export default function JoinRoomPage() {
                     marginBottom: 6,
                   }}
                 >
-                  Your name
+                  Display name (optional)
                 </label>
                 <input
                   id="join-name"
                   autoFocus
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Alex"
+                  placeholder="Skip for now — e.g. Alex"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") void handleJoin();
                   }}
@@ -225,7 +237,11 @@ export default function JoinRoomPage() {
                   disabled={submitting}
                   onClick={() => void handleJoin()}
                 >
-                  {submitting ? "Joining…" : "Enter the warehouse"}
+                  {submitting
+                    ? "Joining…"
+                    : name.trim()
+                      ? "Enter the warehouse"
+                      : "Join without name"}
                 </GameButton>
               </>
             )}
