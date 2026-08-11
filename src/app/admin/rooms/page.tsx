@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FO, GameButton } from "@/components/cyan";
 import { AdminShell, AdminSection } from "@/components/admin/AdminShell";
-import { reauthIfAdminExpired } from "@/components/admin/AdminGate";
+import { handleAdminAuthFailure } from "@/lib/adminAuthClient";
 import { api, USE_MOCK } from "@/services/api";
 import { parseApiFailure } from "@/services/apiErrors";
 
@@ -41,7 +41,7 @@ export default function AdminRoomsPage() {
           ),
       );
     } catch (e) {
-      if (await reauthIfAdminExpired(e)) return;
+      if (handleAdminAuthFailure(e)) return;
       setError(parseApiFailure(e).message);
     } finally {
       setLoading(false);
@@ -63,7 +63,7 @@ export default function AdminRoomsPage() {
       const room = await api.adminCreateRoom({});
       router.push(`/admin/rooms/${encodeURIComponent(room.heat_id)}`);
     } catch (e) {
-      if (await reauthIfAdminExpired(e)) return;
+      if (handleAdminAuthFailure(e)) return;
       setError(parseApiFailure(e).message);
       setCreating(false);
     }
@@ -105,13 +105,9 @@ export default function AdminRoomsPage() {
           lineHeight: 1.45,
         }}
       >
-        Create a group, then share the access code or join link with players.
-        Multi-device play needs live mode (
-        <code>NEXT_PUBLIC_USE_MOCK=false</code>), same origin, and a single server
-        instance with persistent disk.
         {USE_MOCK
-          ? " You are currently in mock mode (this browser only)."
-          : " Live API mode — admin PIN is verified on the server."}
+          ? "Mock mode: any non-empty PIN unlocks this browser only. Multi-device classroom play needs live mode (NEXT_PUBLIC_USE_MOCK=false)."
+          : "Live mode: unlock with the server ADMIN_PIN (Railway env). Sessions reset after redeploy — use Log out then unlock again if create/list fails."}
       </p>
 
       {error && (

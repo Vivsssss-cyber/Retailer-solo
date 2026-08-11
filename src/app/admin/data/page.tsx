@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { FO, GameButton, cardStyle } from "@/components/cyan";
 import { AdminShell, AdminSection, StatTile } from "@/components/admin/AdminShell";
 import { AdminCreateHeat } from "@/components/admin/AdminCreateHeat";
-import { reauthIfAdminExpired } from "@/components/admin/AdminGate";
+import { handleAdminAuthFailure } from "@/lib/adminAuthClient";
 import { api, USE_MOCK } from "@/services/api";
 import { parseApiFailure } from "@/services/apiErrors";
 
@@ -42,9 +42,8 @@ export default function AdminDataPage() {
       setAttempts(data.attempts);
       setStats(data.stats);
     } catch (e) {
+      if (handleAdminAuthFailure(e)) return;
       console.error("Failed to load admin data", e);
-      if (await reauthIfAdminExpired(e)) return;
-      alert(parseApiFailure(e).message);
     } finally {
       setLoading(false);
     }
@@ -60,8 +59,8 @@ export default function AdminDataPage() {
         setAttempts(data.attempts);
         setStats(data.stats);
       } catch (e) {
+        if (handleAdminAuthFailure(e)) return;
         console.error("Failed to load admin data", e);
-        if (active) await reauthIfAdminExpired(e);
       } finally {
         if (active) setLoading(false);
       }
@@ -77,19 +76,19 @@ export default function AdminDataPage() {
       await api.toggleHeatStatus(heatId);
       await refresh();
     } catch (e) {
-      if (await reauthIfAdminExpired(e)) return;
-      alert(parseApiFailure(e).message || "Failed to toggle heat status");
+      if (handleAdminAuthFailure(e)) return;
+      alert(parseApiFailure(e).message || "Failed to toggle group status");
     }
   };
 
   const handleDeleteHeat = async (heatId: string, accessCode: string) => {
-    if (!confirm(`Are you sure you want to permanently delete heat ${accessCode} and all its attempts?`)) return;
+    if (!confirm(`Are you sure you want to permanently delete group ${accessCode} and all its attempts?`)) return;
     try {
       await api.deleteHeat(heatId);
       await refresh();
     } catch (e) {
-      if (await reauthIfAdminExpired(e)) return;
-      alert(parseApiFailure(e).message || "Failed to delete heat");
+      if (handleAdminAuthFailure(e)) return;
+      alert(parseApiFailure(e).message || "Failed to delete group");
     }
   };
 

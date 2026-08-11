@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { FO, GameButton, GridBackground, PageTransition, cardStyle } from "@/components/cyan";
 import { BookOpen, Package, Target, Trophy, Wallet } from "@/components/cyan/PixelIcons";
-import { lockAdminSession } from "@/components/admin/AdminGate";
+import { logoutAdminAndReload } from "@/lib/adminAuthClient";
 
 const NAV = [
   { href: "/admin", label: "Overview", exact: true },
-  { href: "/admin/rooms", label: "Rooms" },
+  { href: "/admin/rooms", label: "Groups" },
   { href: "/admin/game", label: "Game numbers" },
   { href: "/admin/sequences", label: "Demand & supply" },
   { href: "/admin/data", label: "Sessions & data" },
@@ -27,24 +27,20 @@ export function AdminShell({
   actions?: ReactNode;
 }) {
   const pathname = usePathname();
-  const [locking, setLocking] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  async function handleLock() {
-    if (locking) return;
-    setLocking(true);
-    try {
-      await lockAdminSession();
-    } finally {
-      setLocking(false);
-    }
-  }
+  const onLogout = () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    void logoutAdminAndReload();
+  };
 
   return (
     <GridBackground>
       <PageTransition>
         <div className="max-w-[1100px] mx-auto px-4 py-6" style={{ color: "var(--sv-text)" }}>
           <header className="flex flex-wrap items-start justify-between gap-3 mb-5">
-            <div className="min-w-0 flex-1">
+            <div>
               <p
                 style={{
                   fontFamily: FO,
@@ -75,19 +71,19 @@ export function AdminShell({
                 </p>
               )}
             </div>
-            <div className="flex flex-wrap gap-2 items-center justify-end shrink-0">
+            <div className="flex flex-wrap gap-2 items-center">
               {actions}
               <GameButton
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={locking}
-                onClick={() => void handleLock()}
+                disabled={loggingOut}
+                onClick={onLogout}
               >
-                {locking ? "Signing out…" : "Lock admin"}
+                {loggingOut ? "Logging out…" : "Log out"}
               </GameButton>
               <Link href="/">
-                <GameButton type="button" variant="secondary" size="sm">
+                <GameButton type="button" variant="outline" size="sm">
                   Back to game
                 </GameButton>
               </Link>

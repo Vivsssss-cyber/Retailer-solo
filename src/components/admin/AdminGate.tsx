@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { FO, GameButton, GridBackground, PageTransition, cardStyle } from "@/components/cyan";
 import {
   isAdminUnlocked,
@@ -11,107 +11,105 @@ import {
 import { api, USE_MOCK } from "@/services/api";
 import { parseApiFailure } from "@/services/apiErrors";
 
-/**
- * Live: client sessionStorage is only a UI hint — always re-check the
- * server cookie session so redeploys / expired cookies re-prompt for PIN.
- */
+/** sessionStorage has no change events in-tab; PIN unlock updates local state. */
+const subscribeNoop = () => () => {};
+
 export function AdminGate({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<"checking" | "locked" | "unlocked">(
-    () => (USE_MOCK && isAdminUnlocked() ? "unlocked" : "checking"),
+  const sessionUnlocked = useSyncExternalStore(
+    subscribeNoop,
+    isAdminUnlocked,
+    () => false,
   );
+  const [localUnlocked, setLocalUnlocked] = useState(false);
+  const [checking, setChecking] = useState(!USE_MOCK);
+  const unlocked = sessionUnlocked || localUnlocked;
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const lockUi = useCallback(() => {
-    lockAdmin();
-    setPin("");
-    setStatus("locked");
-  }, []);
-
-  const unlockUi = useCallback(() => {
-    markAdminUnlocked();
-    setStatus("unlocked");
-  }, []);
-
-  // Validate on mount + when child pages fire "rc-admin-lock"
+  // Live: confirm httpOnly session still valid (redeploy wipes in-memory sessions).
   useEffect(() => {
+    if (USE_MOCK) {
+      setChecking(false);
+      return;
+    }
     let cancelled = false;
-
-    const onLockEvent = () => {
-      lockUi();
-    };
-    window.addEventListener("rc-admin-lock", onLockEvent);
-
-    void (async () => {
-      if (USE_MOCK) {
-        if (!cancelled) {
-          setStatus(isAdminUnlocked() ? "unlocked" : "locked");
-        }
-        return;
-      }
+    (async () => {
       try {
-        const { authenticated } = await api.adminSession();
+        const session = await api.getAdminSession();
         if (cancelled) return;
-        if (authenticated) {
+        if (session.authenticated) {
           markAdminUnlocked();
-          setStatus("unlocked");
+          setLocalUnlocked(true);
         } else {
           lockAdmin();
-          setStatus("locked");
+          setLocalUnlocked(false);
         }
       } catch {
         if (!cancelled) {
           lockAdmin();
-          setStatus("locked");
+          setLocalUnlocked(false);
         }
+      } finally {
+        if (!cancelled) setChecking(false);
       }
     })();
-
     return () => {
       cancelled = true;
-      window.removeEventListener("rc-admin-lock", onLockEvent);
     };
-  }, [lockUi]);
+  }, []);
 
-  async function tryUnlock() {
+  const tryUnlock = useCallback(async () => {
     setError(null);
     setBusy(true);
     try {
       if (USE_MOCK) {
         if (!unlockAdminMock(pin)) {
-          setError("Enter the admin PIN");
+          setError("Enter any non-empty PIN for mock unlock");
           return;
         }
-        unlockUi();
+        setLocalUnlocked(true);
+        setPin("");
         return;
       }
       await api.adminLogin(pin);
-      unlockUi();
+      markAdminUnlocked();
+      setLocalUnlocked(true);
       setPin("");
     } catch (e) {
       const { message } = parseApiFailure(e);
-      setError(message || "Incorrect PIN");
-      lockAdmin();
-      setStatus("locked");
+      setError(
+        message ||
+          "Incorrect PIN. Use the ADMIN_PIN set on the server (Railway env), not a demo default.",
+      );
     } finally {
       setBusy(false);
     }
-  }
+  }, [pin]);
 
-  if (status === "checking") {
+  if (checking) {
     return (
       <GridBackground>
-        <main className="max-w-md mx-auto px-4 py-16">
-          <p style={{ fontFamily: FO, color: "var(--sv-text-muted)", textAlign: "center" }}>
-            Checking admin session…
-          </p>
-        </main>
+        <PageTransition>
+          <main className="max-w-md mx-auto px-4 py-16">
+            <div style={{ ...cardStyle, padding: 28 }}>
+              <p
+                style={{
+                  fontFamily: FO,
+                  fontSize: 13,
+                  color: "var(--sv-text-secondary)",
+                }}
+              >
+                Checking admin session…
+              </p>
+            </div>
+          </main>
+        </PageTransition>
       </GridBackground>
     );
   }
 
-  if (status === "locked") {
+  if (!unlocked) {
     return (
       <GridBackground>
         <PageTransition>
@@ -134,23 +132,24 @@ export function AdminGate({ children }: { children: ReactNode }) {
                   fontSize: 13,
                   color: "var(--sv-text-secondary)",
                   marginBottom: 20,
+                  lineHeight: 1.45,
                 }}
               >
-                Enter the admin PIN to manage game numbers, demand sequences, and session data.
+                Enter the admin PIN to manage groups, game numbers, and session data.
                 {USE_MOCK
                   ? " Mock mode: any non-empty PIN unlocks this browser only."
-                  : " Live mode: PIN is verified on the server (never shown here)."}
+                  : " Live mode: use the ADMIN_PIN from the server environment (e.g. Railway). After a redeploy you must unlock again."}
               </p>
               <input
                 type="password"
                 value={pin}
+                autoComplete="current-password"
+                disabled={busy}
                 onChange={(e) => setPin(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !busy) void tryUnlock();
                 }}
                 placeholder="Admin PIN"
-                autoComplete="current-password"
-                autoFocus
                 style={{
                   fontFamily: FO,
                   width: "100%",
@@ -169,6 +168,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
                     fontSize: 12,
                     color: "var(--sv-negative)",
                     marginBottom: 12,
+                    lineHeight: 1.4,
                   }}
                 >
                   {error}
@@ -190,36 +190,4 @@ export function AdminGate({ children }: { children: ReactNode }) {
   }
 
   return <>{children}</>;
-}
-
-/**
- * Lock admin UI + clear server cookie (live). Safe to call from any admin page.
- * Dispatches an event so AdminGate re-renders the PIN screen without a full reload.
- */
-export async function lockAdminSession(): Promise<void> {
-  lockAdmin();
-  if (!USE_MOCK) {
-    try {
-      await api.adminLogout();
-    } catch {
-      // Cookie clear may still have applied; ignore network blips on logout
-    }
-  }
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("rc-admin-lock"));
-  }
-}
-
-/** If an admin API call returned 401/unauthorized, force the PIN screen. */
-export async function reauthIfAdminExpired(err: unknown): Promise<boolean> {
-  const { code, message } = parseApiFailure(err);
-  const expired =
-    code === "UNAUTHORIZED" ||
-    code === "FORBIDDEN" ||
-    /admin credentials|admin pin|sign in again|incorrect admin pin/i.test(
-      message,
-    );
-  if (!expired) return false;
-  await lockAdminSession();
-  return true;
 }

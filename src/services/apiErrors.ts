@@ -50,7 +50,7 @@ function friendlyMessage(code: string | undefined, fallback: string): string {
     case "FORBIDDEN":
       return (
         fallback ||
-        "Admin session expired or PIN is incorrect. Unlock admin again."
+        "Admin session expired or missing. Log in again with the server ADMIN_PIN."
       );
     case "RATE_LIMITED":
       return "Too many attempts. Wait a moment and try again.";

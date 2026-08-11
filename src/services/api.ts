@@ -129,7 +129,7 @@ const liveApi: RetailerChallengeApi = {
       method: "POST",
       body: JSON.stringify({}),
     }),
-  adminSession: () => request<{ authenticated: boolean }>(`/admin/session`),
+  getAdminSession: () => request(`/admin/session`),
   getAdminData: () => request(`/admin/data`),
   clearAdminData: () =>
     request(`/admin/clear`, {

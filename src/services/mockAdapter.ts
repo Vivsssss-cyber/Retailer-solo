@@ -19,7 +19,9 @@ import {
 import {
   isAdminUnlocked,
   loadAdminConfig,
+  lockAdmin,
   saveAdminConfig,
+  unlockAdminMock,
 } from "@/lib/adminConfigStore";
 import { persistPlayerToken, readPlayerToken } from "@/lib/playerTokenStore";
 import type {
@@ -533,16 +535,20 @@ export const mockAdapter: RetailerChallengeApi = {
     return sortFinal(rows);
   },
 
-  async adminLogin(_pin: string) {
+  async adminLogin(pin: string) {
+    if (!unlockAdminMock(pin)) {
+      throw errorWithCode("UNAUTHORIZED", "Enter the admin PIN");
+    }
     return { ok: true as const };
   },
 
   async adminLogout() {
+    lockAdmin();
     return { ok: true as const };
   },
 
-  async adminSession() {
-    return { authenticated: true as const };
+  async getAdminSession() {
+    return { authenticated: isAdminUnlocked() };
   },
 
   async getAdminData() {
