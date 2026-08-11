@@ -61,7 +61,9 @@ function isCostKey(key: string): boolean {
 /** Legend / tooltip label for series keys. */
 function seriesLabel(key: string): string {
   const l = key.toLowerCase();
-  if (l === "total cost" || l === "totalcost" || l === "costs") return "Cost";
+  if (l === "round cost") return "Round cost";
+  if (l === "total cost" || l === "totalcost" || l === "costs" || l === "cumulative cost")
+    return "Total cost";
   if (l === "inventory" || l === "stock") return "Inventory";
   if (l === "backlog") return "Backlog";
   if (l === "demand") return "Demand";
