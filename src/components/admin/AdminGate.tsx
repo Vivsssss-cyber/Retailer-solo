@@ -28,11 +28,9 @@ export function AdminGate({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
 
   // Live: confirm httpOnly session still valid (redeploy wipes in-memory sessions).
+  // Mock starts with checking=false (useState(!USE_MOCK)); no sync setState needed.
   useEffect(() => {
-    if (USE_MOCK) {
-      setChecking(false);
-      return;
-    }
+    if (USE_MOCK) return;
     let cancelled = false;
     (async () => {
       try {
