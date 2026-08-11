@@ -69,7 +69,9 @@ export function CoachOverlay({
   return (
     <div
       className={[
-        "fixed z-[60] pointer-events-none",
+        // A fixed coach obscures the compact chart stack on phones. The same
+        // guidance remains available through the header's How to play control.
+        "hidden sm:block fixed z-[60] pointer-events-none",
         // Clear the 2-row place-order dock + safe area on phones
         "left-2 right-2 bottom-[calc(11.25rem+env(safe-area-inset-bottom,0px))]",
         // Tablet+: float above dock, right-aligned

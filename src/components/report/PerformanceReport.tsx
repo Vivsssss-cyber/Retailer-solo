@@ -191,7 +191,9 @@ export function PerformanceReportView({
             <img
               src="/images/intro/spark.svg"
               alt=""
-              className="w-[28px] h-[28px] object-contain absolute -left-10 -top-1"
+              /* Decorative only — hangs 40px outside the w-fit heading, which is
+                 wider than a phone viewport and dragged the page into h-scroll. */
+              className="hidden sm:block w-[28px] h-[28px] object-contain absolute -left-10 -top-1"
             />
             <h2
               style={{
@@ -208,7 +210,7 @@ export function PerformanceReportView({
             <img
               src="/images/intro/spark.svg"
               alt=""
-              className="w-[28px] h-[28px] object-contain absolute -right-10 -top-1"
+              className="hidden sm:block w-[28px] h-[28px] object-contain absolute -right-10 -top-1"
             />
           </div>
           <p style={{ fontFamily: FO, fontSize: 13, color: "var(--sv-text-secondary)" }}>
@@ -473,8 +475,13 @@ export function PerformanceReportView({
           </p>
         </div>
 
-        {/* Evolution charts — responsive plot host (fills on wide, compact on narrow) */}
-        <div className="w-full min-w-0 h-[clamp(220px,42vw,360px)] sm:h-[clamp(260px,36vw,380px)]">
+        {/*
+          Evolution charts — responsive plot host (fills on wide, compact on narrow).
+          Mobile floors match the declared plot heights: card chrome (title + a
+          two-row legend + padding) costs ~125px on a phone, so a shorter host
+          leaves the plot a sliver.
+        */}
+        <div className="w-full min-w-0 h-[clamp(300px,42vw,360px)] sm:h-[clamp(300px,36vw,380px)]">
           <GraphicalView
             data={{
               type: "evolution",
@@ -488,7 +495,7 @@ export function PerformanceReportView({
           />
         </div>
 
-        <div className="w-full min-w-0 h-[clamp(200px,38vw,320px)] sm:h-[clamp(240px,32vw,340px)]">
+        <div className="w-full min-w-0 h-[clamp(270px,38vw,320px)] sm:h-[clamp(270px,32vw,340px)]">
           <GraphicalView
             data={{
               type: "evolution",
@@ -506,7 +513,7 @@ export function PerformanceReportView({
           />
         </div>
 
-        <div className="w-full min-w-0 h-[clamp(200px,36vw,300px)] sm:h-[clamp(220px,30vw,320px)]">
+        <div className="w-full min-w-0 h-[clamp(250px,36vw,300px)] sm:h-[clamp(250px,30vw,320px)]">
           <GraphicalView
             data={{
               type: "evolution",

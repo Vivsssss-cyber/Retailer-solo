@@ -215,9 +215,13 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
                   data-tour="graphs"
                   className={[
                     "min-h-0 min-w-0 flex flex-col",
-                    "h-[min(44svh,380px)] min-h-[220px]",
-                    "sm:h-[min(40svh,400px)] sm:min-h-[240px]",
-                    "lg:flex-[3] lg:h-auto lg:min-h-[200px]",
+                    // Below lg the page scrolls: let the chart cards size themselves
+                    // (their own min-heights) instead of squeezing two plots into a
+                    // svh slice too short for legend + axis — that overflowed the card.
+                    "shrink-0 h-auto",
+                    // 184 = card chrome + legend + MIN_FILL_H. Any taller and the
+                    // locked lg column can't also fit the history row on a 700px screen.
+                    "lg:shrink lg:flex-[3] lg:min-h-[184px]",
                   ].join(" ")}
                 >
                   <TrendPanel rounds={attempt.rounds} dense />

@@ -21,7 +21,6 @@ import { DEFAULT_CONFIG, type GameConfig } from "@/engine";
 import { loadAdminConfig } from "@/lib/adminConfigStore";
 import { api, USE_MOCK } from "@/services/api";
 import {
-  PERSONA_AVATAR_PLACEHOLDER,
   personaBySlug,
   type CoachExpression,
   type PersonaSlug,
@@ -39,10 +38,9 @@ import { hasCompletedPlayTour } from "@/lib/playTour";
 const COACH_LINES: Record<string, string> = {
   welcome: "I'm your coach. Before we open the warehouse — let's get you set up.",
   mode: "Join a group with the code from your instructor. Solo practice only if they enabled it.",
-  practiceFast: "Pick a face and a name — cosmetic only. Then we open the warehouse.",
-  identity:
-    "Avatar and name are cosmetic only — they never change scoring or fairness.",
-  heatCode: "Enter the group code. You can add your name on the next screen.",
+  practiceFast: "Pick a persona — face only, cosmetic. Then we open the warehouse.",
+  identity: "Pick a persona — face only. Cosmetic only — never changes scoring.",
+  heatCode: "Enter the group code. Next screen you pick a persona.",
   official:
     "Official is one attempt per email — permanent for this group. Practice is unlimited.",
   officialConfirm:
@@ -319,26 +317,21 @@ function ModeScreen({
   );
 }
 
-/** Solo practice fast path: avatar + name on one screen → start. */
+/** Solo practice fast path: persona face only → start. */
 function PracticeFastScreen({
   persona,
-  name,
   onPersonaChange,
-  onNameChange,
   onStart,
   onBack,
   onHoverPersona,
 }: {
   persona: PersonaSlug | "";
-  name: string;
   onPersonaChange: (slug: PersonaSlug) => void;
-  onNameChange: (v: string) => void;
   onStart: () => void;
   onBack: () => void;
   onHoverPersona?: (slug: PersonaSlug | null) => void;
 }) {
-  const selected = personaBySlug(persona);
-  const canStart = !!persona && name.trim().length > 0;
+  const canStart = !!persona;
 
   return (
     <GlassCard className="p-4">
@@ -364,7 +357,7 @@ function PracticeFastScreen({
           lineHeight: 1.45,
         }}
       >
-        Pick a face and a name — then start. One screen, no extra steps.
+        Pick a persona — then start. Face only, no roles or names.
       </p>
       <p
         style={{
@@ -392,107 +385,13 @@ function PracticeFastScreen({
           marginBottom: 10,
         }}
       >
-        Avatar
+        Persona
       </span>
       <PersonaPicker
         value={persona}
         onChange={onPersonaChange}
         onHover={onHoverPersona}
       />
-
-      <label
-        htmlFor="practice-name"
-        style={{
-          display: "block",
-          fontFamily: FO,
-          fontSize: 10,
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          color: "var(--sv-teal-mid)",
-          marginBottom: 8,
-        }}
-      >
-        Display name
-      </label>
-      <input
-        id="practice-name"
-        value={name}
-        onChange={(e) => onNameChange(e.target.value)}
-        placeholder="e.g. Ava"
-        maxLength={24}
-        style={{
-          width: "100%",
-          fontFamily: FO,
-          fontSize: 18,
-          padding: "14px 16px",
-          borderRadius: 12,
-          border: "2px solid var(--sv-border)",
-          background: "rgba(255,255,255,0.8)",
-          color: "var(--sv-ink)",
-          marginBottom: 16,
-          outline: "none",
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && canStart) onStart();
-        }}
-      />
-
-      {selected && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            marginBottom: 20,
-            padding: "10px 12px",
-            borderRadius: 12,
-            border: "1px solid var(--sv-border)",
-            background: "rgba(255,255,255,0.6)",
-          }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={selected.avatarSrc}
-            alt=""
-            width={40}
-            height={40}
-            style={{
-              width: 40,
-              height: 40,
-              objectFit: "contain",
-              imageRendering: "pixelated",
-            }}
-            onError={(e) => {
-              e.currentTarget.src = PERSONA_AVATAR_PLACEHOLDER;
-            }}
-          />
-          <div className="min-w-0">
-            <p
-              style={{
-                fontFamily: FO,
-                fontSize: 14,
-                fontWeight: 700,
-                color: "var(--sv-ink)",
-                margin: 0,
-              }}
-              className="truncate"
-            >
-              {name.trim() || "Add a display name"}
-            </p>
-            <p
-              style={{
-                fontFamily: FO,
-                fontSize: 11,
-                color: "var(--sv-text-muted)",
-                margin: 0,
-              }}
-            >
-              {selected.name} · board only
-            </p>
-          </div>
-        </div>
-      )}
 
       <div className="flex gap-2">
         <BackButton onClick={onBack} />
@@ -500,186 +399,6 @@ function PracticeFastScreen({
           Start practice
         </GameButton>
       </div>
-    </GlassCard>
-  );
-}
-
-/** Combined avatar + name — heat/host path only. */
-function IdentityScreen({
-  persona,
-  name,
-  onPersonaChange,
-  onNameChange,
-  onNext,
-  onHoverPersona,
-}: {
-  persona: PersonaSlug | "";
-  name: string;
-  onPersonaChange: (slug: PersonaSlug) => void;
-  onNameChange: (v: string) => void;
-  onNext: () => void;
-  onHoverPersona?: (slug: PersonaSlug | null) => void;
-}) {
-  const selected = personaBySlug(persona);
-  const canContinue = !!persona && name.trim().length > 0;
-
-  return (
-    <GlassCard className="p-4">
-      <h2
-        style={{
-          fontFamily: FO,
-          fontWeight: 700,
-          fontSize: 24,
-          color: "var(--sv-ink)",
-          marginBottom: 4,
-          textAlign: "center",
-        }}
-      >
-        Your identity
-      </h2>
-      <p
-        style={{
-          fontFamily: FO,
-          fontSize: 14,
-          color: "var(--sv-text-secondary)",
-          marginBottom: 8,
-          textAlign: "center",
-          lineHeight: 1.45,
-        }}
-      >
-        Avatar and name for the board only.
-      </p>
-      <p
-        style={{
-          fontFamily: FO,
-          fontSize: 12,
-          fontWeight: 700,
-          color: "var(--sv-teal-mid)",
-          marginBottom: 20,
-          textAlign: "center",
-          letterSpacing: "0.02em",
-        }}
-      >
-        Cosmetic — never affects score or fairness
-      </p>
-
-      <span
-        style={{
-          display: "block",
-          fontFamily: FO,
-          fontSize: 10,
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          color: "var(--sv-teal-mid)",
-          marginBottom: 10,
-        }}
-      >
-        Avatar
-      </span>
-      <PersonaPicker
-        value={persona}
-        onChange={onPersonaChange}
-        onHover={onHoverPersona}
-      />
-
-      <label
-        htmlFor="player-name"
-        style={{
-          display: "block",
-          fontFamily: FO,
-          fontSize: 10,
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          color: "var(--sv-teal-mid)",
-          marginBottom: 8,
-        }}
-      >
-        Display name
-      </label>
-      <input
-        id="player-name"
-        value={name}
-        onChange={(e) => onNameChange(e.target.value)}
-        placeholder="e.g. Ava"
-        maxLength={24}
-        style={{
-          width: "100%",
-          fontFamily: FO,
-          fontSize: 18,
-          padding: "14px 16px",
-          borderRadius: 12,
-          border: "2px solid var(--sv-border)",
-          background: "rgba(255,255,255,0.8)",
-          color: "var(--sv-ink)",
-          marginBottom: 16,
-          outline: "none",
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && canContinue) onNext();
-        }}
-      />
-
-      {selected && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            marginBottom: 20,
-            padding: "10px 12px",
-            borderRadius: 12,
-            border: "1px solid var(--sv-border)",
-            background: "rgba(255,255,255,0.6)",
-          }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={selected.avatarSrc}
-            alt=""
-            width={40}
-            height={40}
-            style={{
-              width: 40,
-              height: 40,
-              objectFit: "contain",
-              imageRendering: "pixelated",
-            }}
-            onError={(e) => {
-              e.currentTarget.src = PERSONA_AVATAR_PLACEHOLDER;
-            }}
-          />
-          <div className="min-w-0">
-            <p
-              style={{
-                fontFamily: FO,
-                fontSize: 14,
-                fontWeight: 700,
-                color: "var(--sv-ink)",
-                margin: 0,
-              }}
-              className="truncate"
-            >
-              {name.trim() || "Add a display name"}
-            </p>
-            <p
-              style={{
-                fontFamily: FO,
-                fontSize: 11,
-                color: "var(--sv-text-muted)",
-                margin: 0,
-              }}
-            >
-              {selected.name} · board only
-            </p>
-          </div>
-        </div>
-      )}
-
-      <GameButton size="lg" style={{ width: "100%" }} disabled={!canContinue} onClick={onNext}>
-        Continue
-      </GameButton>
     </GlassCard>
   );
 }
@@ -938,9 +657,9 @@ export default function OnboardingFlow() {
   const next = () => setStepIndex((s) => s + 1);
   const back = () => setStepIndex((s) => Math.max(0, s - 1));
 
-  /** Ensure practice has a default persona without forcing the picker. */
+  /** Ensure practice has a persona; display name defaults to Player (no name field). */
   const ensurePracticeProfile = () => {
-    const player = data.name.trim() || "Player";
+    const player = data.name.trim() || readPlayerProfile().name?.trim() || "Player";
     const profile = readPlayerProfile();
     const persona = data.persona || profile.persona || DEFAULT_PERSONA;
     writePlayerProfile({ persona, name: player });
@@ -1004,9 +723,7 @@ export default function OnboardingFlow() {
         component: (
           <PracticeFastScreen
             persona={data.persona}
-            name={data.name}
             onPersonaChange={(v) => updateData("persona", v)}
-            onNameChange={(v) => updateData("name", v)}
             onStart={() => {
               ensurePracticeProfile();
               goToPlayOrTutorial();

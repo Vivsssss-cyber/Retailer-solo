@@ -67,6 +67,15 @@ export function TrendPanel({
 
   const cardPad = dense ? 12 : 14;
 
+  /**
+   * Floor that fits card chrome + legend + plot + x-axis. Below lg the parent is
+   * auto-height and this is what actually sizes the card; at lg the viewport-locked
+   * shell drives height and the floor is released so the row can compress.
+   */
+  const cardSize = dense
+    ? "min-h-[232px] sm:min-h-[248px] lg:min-h-0 lg:h-full"
+    : "";
+
   return (
     <div
       className={[
@@ -83,7 +92,7 @@ export function TrendPanel({
           // Allow tooltip / axis ticks to paint outside plot box
           overflow: "visible",
         }}
-        className="sv-surface sv-chart-card flex flex-col min-h-0 min-w-0 w-full"
+        className={`sv-surface sv-chart-card flex flex-col min-h-0 min-w-0 w-full ${cardSize}`}
       >
         <div className={`shrink-0 ${dense ? "mb-1.5" : "mb-2"}`}>
           <span style={titleStyle}>Inventory &amp; flow</span>
@@ -107,7 +116,7 @@ export function TrendPanel({
           minHeight: dense ? 0 : undefined,
           overflow: "visible",
         }}
-        className="sv-surface sv-chart-card flex flex-col min-h-0 min-w-0 w-full"
+        className={`sv-surface sv-chart-card flex flex-col min-h-0 min-w-0 w-full ${cardSize}`}
       >
         <div className={`shrink-0 ${dense ? "mb-1.5" : "mb-2"}`}>
           <span style={titleStyle}>Cost over time</span>

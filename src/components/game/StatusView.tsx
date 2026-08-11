@@ -18,6 +18,28 @@ const MARKER_DELAYS = {
 } as const;
 
 const customStyles = `
+/*
+  Sizing tokens live here, not inline on the root node: an inline custom property
+  out-ranks every stylesheet rule, so the phone media queries below were dead and
+  handsets kept rendering the 88px desktop rail.
+*/
+.sv-status-view {
+  --sv-node-size: 72px;
+  --sv-icon-well: 50px;
+  --sv-rail-top: 56px;
+  --sv-avatar-size: 64px;
+  --sv-marker-w: 140px;
+  --sv-marker-h: 88px;
+  --sv-marker-pill-top: 2px;
+  --sv-marker-icon-top: 44px;
+  --sv-marker-label-top: 62px;
+  --sv-marker-lift-y: -84px;
+}
+.sv-status-view--sim {
+  --sv-node-size: 88px;
+  --sv-icon-well: 58px;
+  --sv-rail-top: 92px;
+}
 @keyframes float-subtle {
   0%, 100% { transform: translate3d(0, 0, 0); }
   50% { transform: translate3d(0, -2px, 0); }
@@ -64,6 +86,22 @@ const customStyles = `
   width: var(--sv-avatar-size, 64px);
   height: var(--sv-avatar-size, 64px);
 }
+/* Marker box + the three rows inside it scale together — shrinking only the box
+   left the label pinned at its desktop offset, outside the box and on top of the
+   stage node. Lift must clear (marker height + node half) or the label collides. */
+.sv-float-marker-inner {
+  width: var(--sv-marker-w, 140px);
+  height: var(--sv-marker-h, 88px);
+}
+.sv-marker-pill {
+  top: var(--sv-marker-pill-top, 2px);
+}
+.sv-marker-icon {
+  top: var(--sv-marker-icon-top, 44px);
+}
+.sv-marker-label {
+  top: var(--sv-marker-label-top, 62px);
+}
 /* Phones: denser rail so round summary fits without endless scroll */
 @media (max-width: 640px) {
   .sv-status-view--sim {
@@ -71,7 +109,12 @@ const customStyles = `
     --sv-icon-well: 32px;
     --sv-rail-top: 52px;
     --sv-avatar-size: 40px;
-    --sv-marker-lift-y: -48px;
+    --sv-marker-w: 104px;
+    --sv-marker-h: 72px;
+    --sv-marker-pill-top: 0px;
+    --sv-marker-icon-top: 34px;
+    --sv-marker-label-top: 50px;
+    --sv-marker-lift-y: -92px;
     padding: 10px 8px 8px !important;
   }
   .sv-status-view:not(.sv-status-view--sim) {
@@ -82,12 +125,13 @@ const customStyles = `
     font-size: 10px !important;
   }
   .sv-status-sim-area {
-    padding-top: 56px !important;
-    min-height: 172px !important;
+    /* Reserve a full marker row below the title. Without this, settled
+       amount pills rise into "Supply Chain Overview" on phone widths. */
+    padding-top: 92px !important;
+    min-height: 200px !important;
   }
-  .sv-float-marker-inner {
-    width: 108px !important;
-    height: 72px !important;
+  .sv-marker-label span {
+    font-size: 11px !important;
   }
   .sv-status-view--sim .sv-status-sim-area {
     padding-bottom: 2px !important;
@@ -100,11 +144,14 @@ const customStyles = `
     --sv-node-size: 44px;
     --sv-icon-well: 28px;
     --sv-avatar-size: 36px;
-    --sv-marker-lift-y: -40px;
+    --sv-marker-h: 68px;
+    --sv-marker-icon-top: 32px;
+    --sv-marker-label-top: 46px;
+    --sv-marker-lift-y: -84px;
   }
   .sv-status-sim-area {
-    padding-top: 44px !important;
-    min-height: 148px !important;
+    padding-top: 84px !important;
+    min-height: 176px !important;
   }
 }
 @media (hover: hover) and (pointer: fine) {
@@ -246,26 +293,13 @@ export default function StatusView({
   const nextCenter = getCenterPct(Math.min(data.stages.length - 1, currentIdx + 1));
 
   const showPlayerAvatar = Boolean(playerAvatarSrc) && showSimulation;
-  // Prefer CSS vars so mobile can scale without JS matchMedia.
-  const nodeSize = showSimulation ? 88 : 72;
-  const iconWell = showSimulation ? 58 : 50;
-  const railTop = showSimulation ? 92 : 56;
 
   return (
     <div
       className={`sv-glass-card sv-status-view relative h-full flex flex-col ${
         showSimulation ? "sv-status-view--sim" : ""
       }`}
-      style={
-        {
-          padding: showSimulation ? "14px 12px 12px" : 12,
-          ["--sv-node-size" as string]: `${nodeSize}px`,
-          ["--sv-icon-well" as string]: `${iconWell}px`,
-          ["--sv-rail-top" as string]: `${railTop}px`,
-          ["--sv-avatar-size" as string]: "64px",
-          ["--sv-marker-lift-y" as string]: "-84px",
-        } as React.CSSProperties
-      }
+      style={{ padding: showSimulation ? "14px 12px 12px" : 12 }}
     >
       <style dangerouslySetInnerHTML={{ __html: customStyles }} />
 
@@ -792,15 +826,9 @@ function FlowMarker({
             }}
           >
             <div className="sv-float-marker">
-              <div
-                className="sv-float-marker-inner relative"
-                style={{ width: 140, height: 88 }}
-              >
+              <div className="sv-float-marker-inner relative">
                 {/* Value Pill (Top) */}
-                <div
-                  className="absolute w-full flex justify-center"
-                  style={{ top: 2 }}
-                >
+                <div className="sv-marker-pill absolute w-full flex justify-center">
                   <div
                     className="sv-tabular"
                     style={{
@@ -832,8 +860,8 @@ function FlowMarker({
 
                 {/* Icon (Center on rail) */}
                 <div
-                  className="absolute w-full flex justify-center"
-                  style={{ top: 44, transform: "translateY(-50%)" }}
+                  className="sv-marker-icon absolute w-full flex justify-center"
+                  style={{ transform: "translateY(-50%)" }}
                 >
                   <div
                     style={{
@@ -845,10 +873,7 @@ function FlowMarker({
                 </div>
 
                 {/* Label (Bottom) */}
-                <div
-                  className="absolute w-full flex justify-center"
-                  style={{ top: 62 }}
-                >
+                <div className="sv-marker-label absolute w-full flex justify-center">
                   <span
                     style={{
                       fontFamily: FO,
