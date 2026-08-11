@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Outfit } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const outfit = Outfit({
-  subsets: ["latin"],
+// Self-hosted so production builds never need network access to Google Fonts
+// (turbopack Docker builds fail resolving the internal google-font module offline).
+const outfit = localFont({
+  src: "./fonts/Outfit-Variable-latin.woff2",
   variable: "--font-outfit",
-  // Fewer weights = faster first paint (especially over tunnel / mobile)
-  weight: ["400", "500", "600", "700"],
+  weight: "100 900",
   display: "swap",
 });
 
