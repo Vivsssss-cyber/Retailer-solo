@@ -95,6 +95,8 @@ export interface RetailerChallengeApi {
   /** Live: server verifies PIN, sets httpOnly cookie. Mock: no-op. */
   adminLogin(pin: string): Promise<{ ok: true }>;
   adminLogout(): Promise<{ ok: true }>;
+  /** Live: whether the browser cookie session is still valid. Mock: always true when UI unlocked. */
+  adminSession(): Promise<{ authenticated: boolean }>;
   getAdminData(): Promise<{
     heats: Array<{
       heat_id: string;

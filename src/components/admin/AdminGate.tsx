@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { FO, GameButton, GridBackground, PageTransition, cardStyle } from "@/components/cyan";
 import {
   isAdminUnlocked,
@@ -11,20 +11,68 @@ import {
 import { api, USE_MOCK } from "@/services/api";
 import { parseApiFailure } from "@/services/apiErrors";
 
-/** sessionStorage has no change events in-tab; PIN unlock updates local state. */
-const subscribeNoop = () => () => {};
-
+/**
+ * Live: client sessionStorage is only a UI hint — always re-check the
+ * server cookie session so redeploys / expired cookies re-prompt for PIN.
+ */
 export function AdminGate({ children }: { children: ReactNode }) {
-  const sessionUnlocked = useSyncExternalStore(
-    subscribeNoop,
-    isAdminUnlocked,
-    () => false,
+  const [status, setStatus] = useState<"checking" | "locked" | "unlocked">(
+    () => (USE_MOCK && isAdminUnlocked() ? "unlocked" : "checking"),
   );
-  const [localUnlocked, setLocalUnlocked] = useState(false);
-  const unlocked = sessionUnlocked || localUnlocked;
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const lockUi = useCallback(() => {
+    lockAdmin();
+    setPin("");
+    setStatus("locked");
+  }, []);
+
+  const unlockUi = useCallback(() => {
+    markAdminUnlocked();
+    setStatus("unlocked");
+  }, []);
+
+  // Validate on mount + when child pages fire "rc-admin-lock"
+  useEffect(() => {
+    let cancelled = false;
+
+    const onLockEvent = () => {
+      lockUi();
+    };
+    window.addEventListener("rc-admin-lock", onLockEvent);
+
+    void (async () => {
+      if (USE_MOCK) {
+        if (!cancelled) {
+          setStatus(isAdminUnlocked() ? "unlocked" : "locked");
+        }
+        return;
+      }
+      try {
+        const { authenticated } = await api.adminSession();
+        if (cancelled) return;
+        if (authenticated) {
+          markAdminUnlocked();
+          setStatus("unlocked");
+        } else {
+          lockAdmin();
+          setStatus("locked");
+        }
+      } catch {
+        if (!cancelled) {
+          lockAdmin();
+          setStatus("locked");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("rc-admin-lock", onLockEvent);
+    };
+  }, [lockUi]);
 
   async function tryUnlock() {
     setError(null);
@@ -35,21 +83,35 @@ export function AdminGate({ children }: { children: ReactNode }) {
           setError("Enter the admin PIN");
           return;
         }
-        setLocalUnlocked(true);
+        unlockUi();
         return;
       }
       await api.adminLogin(pin);
-      markAdminUnlocked();
-      setLocalUnlocked(true);
+      unlockUi();
+      setPin("");
     } catch (e) {
       const { message } = parseApiFailure(e);
       setError(message || "Incorrect PIN");
+      lockAdmin();
+      setStatus("locked");
     } finally {
       setBusy(false);
     }
   }
 
-  if (!unlocked) {
+  if (status === "checking") {
+    return (
+      <GridBackground>
+        <main className="max-w-md mx-auto px-4 py-16">
+          <p style={{ fontFamily: FO, color: "var(--sv-text-muted)", textAlign: "center" }}>
+            Checking admin session…
+          </p>
+        </main>
+      </GridBackground>
+    );
+  }
+
+  if (status === "locked") {
     return (
       <GridBackground>
         <PageTransition>
@@ -88,6 +150,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
                 }}
                 placeholder="Admin PIN"
                 autoComplete="current-password"
+                autoFocus
                 style={{
                   fontFamily: FO,
                   width: "100%",
@@ -100,14 +163,21 @@ export function AdminGate({ children }: { children: ReactNode }) {
                 }}
               />
               {error && (
-                <p style={{ fontFamily: FO, fontSize: 12, color: "var(--sv-negative)", marginBottom: 12 }}>
+                <p
+                  style={{
+                    fontFamily: FO,
+                    fontSize: 12,
+                    color: "var(--sv-negative)",
+                    marginBottom: 12,
+                  }}
+                >
                   {error}
                 </p>
               )}
               <GameButton
                 type="button"
                 style={{ width: "100%" }}
-                disabled={busy}
+                disabled={busy || !pin.trim()}
                 onClick={() => void tryUnlock()}
               >
                 {busy ? "Checking…" : "Unlock admin"}
@@ -119,19 +189,37 @@ export function AdminGate({ children }: { children: ReactNode }) {
     );
   }
 
-  return (
-    <>
-      {children}
-      {/* Hidden helper for lock paths that import lockAdmin + optional logout */}
-      <span
-        data-admin-unlocked="1"
-        style={{ display: "none" }}
-        aria-hidden
-        onClick={() => {
-          lockAdmin();
-          if (!USE_MOCK) void api.adminLogout();
-        }}
-      />
-    </>
-  );
+  return <>{children}</>;
+}
+
+/**
+ * Lock admin UI + clear server cookie (live). Safe to call from any admin page.
+ * Dispatches an event so AdminGate re-renders the PIN screen without a full reload.
+ */
+export async function lockAdminSession(): Promise<void> {
+  lockAdmin();
+  if (!USE_MOCK) {
+    try {
+      await api.adminLogout();
+    } catch {
+      // Cookie clear may still have applied; ignore network blips on logout
+    }
+  }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("rc-admin-lock"));
+  }
+}
+
+/** If an admin API call returned 401/unauthorized, force the PIN screen. */
+export async function reauthIfAdminExpired(err: unknown): Promise<boolean> {
+  const { code, message } = parseApiFailure(err);
+  const expired =
+    code === "UNAUTHORIZED" ||
+    code === "FORBIDDEN" ||
+    /admin credentials|admin pin|sign in again|incorrect admin pin/i.test(
+      message,
+    );
+  if (!expired) return false;
+  await lockAdminSession();
+  return true;
 }

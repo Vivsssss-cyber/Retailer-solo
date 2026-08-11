@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FO, GameButton } from "@/components/cyan";
 import { AdminShell, AdminSection } from "@/components/admin/AdminShell";
+import { reauthIfAdminExpired } from "@/components/admin/AdminGate";
 import { api, USE_MOCK } from "@/services/api";
 import { parseApiFailure } from "@/services/apiErrors";
 
@@ -40,6 +41,7 @@ export default function AdminRoomsPage() {
           ),
       );
     } catch (e) {
+      if (await reauthIfAdminExpired(e)) return;
       setError(parseApiFailure(e).message);
     } finally {
       setLoading(false);
@@ -61,6 +63,7 @@ export default function AdminRoomsPage() {
       const room = await api.adminCreateRoom({});
       router.push(`/admin/rooms/${encodeURIComponent(room.heat_id)}`);
     } catch (e) {
+      if (await reauthIfAdminExpired(e)) return;
       setError(parseApiFailure(e).message);
       setCreating(false);
     }
@@ -102,11 +105,13 @@ export default function AdminRoomsPage() {
           lineHeight: 1.45,
         }}
       >
-        Demo gate only (PIN <code>admin</code>) — not production auth. Multi-device
-        play needs live mode (
+        Create a group, then share the access code or join link with players.
+        Multi-device play needs live mode (
         <code>NEXT_PUBLIC_USE_MOCK=false</code>), same origin, and a single server
         instance with persistent disk.
-        {USE_MOCK ? " You are currently in mock mode." : " Live API mode."}
+        {USE_MOCK
+          ? " You are currently in mock mode (this browser only)."
+          : " Live API mode — admin PIN is verified on the server."}
       </p>
 
       {error && (

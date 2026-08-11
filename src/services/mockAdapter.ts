@@ -541,6 +541,10 @@ export const mockAdapter: RetailerChallengeApi = {
     return { ok: true as const };
   },
 
+  async adminSession() {
+    return { authenticated: true as const };
+  },
+
   async getAdminData() {
     const store = load();
     const heats = Object.values(store.heats ?? {}).map((h) => ({

@@ -46,6 +46,14 @@ function friendlyMessage(code: string | undefined, fallback: string): string {
       return "Your round is out of sync. Refresh the page to continue.";
     case "INVALID_ORDER":
       return "Order must be a whole number within the allowed range.";
+    case "UNAUTHORIZED":
+    case "FORBIDDEN":
+      return (
+        fallback ||
+        "Admin session expired or PIN is incorrect. Unlock admin again."
+      );
+    case "RATE_LIMITED":
+      return "Too many attempts. Wait a moment and try again.";
     default:
       return fallback || "Something went wrong. Try again.";
   }

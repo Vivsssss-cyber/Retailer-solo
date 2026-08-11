@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { FO, GameButton, GridBackground, PageTransition, cardStyle } from "@/components/cyan";
 import { BookOpen, Package, Target, Trophy, Wallet } from "@/components/cyan/PixelIcons";
+import { lockAdminSession } from "@/components/admin/AdminGate";
 
 const NAV = [
   { href: "/admin", label: "Overview", exact: true },
@@ -26,13 +27,24 @@ export function AdminShell({
   actions?: ReactNode;
 }) {
   const pathname = usePathname();
+  const [locking, setLocking] = useState(false);
+
+  async function handleLock() {
+    if (locking) return;
+    setLocking(true);
+    try {
+      await lockAdminSession();
+    } finally {
+      setLocking(false);
+    }
+  }
 
   return (
     <GridBackground>
       <PageTransition>
         <div className="max-w-[1100px] mx-auto px-4 py-6" style={{ color: "var(--sv-text)" }}>
           <header className="flex flex-wrap items-start justify-between gap-3 mb-5">
-            <div>
+            <div className="min-w-0 flex-1">
               <p
                 style={{
                   fontFamily: FO,
@@ -63,10 +75,19 @@ export function AdminShell({
                 </p>
               )}
             </div>
-            <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex flex-wrap gap-2 items-center justify-end shrink-0">
               {actions}
+              <GameButton
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={locking}
+                onClick={() => void handleLock()}
+              >
+                {locking ? "Signing out…" : "Lock admin"}
+              </GameButton>
               <Link href="/">
-                <GameButton type="button" variant="outline" size="sm">
+                <GameButton type="button" variant="secondary" size="sm">
                   Back to game
                 </GameButton>
               </Link>

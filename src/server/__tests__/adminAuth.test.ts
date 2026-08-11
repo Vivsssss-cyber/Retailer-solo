@@ -57,6 +57,13 @@ describe("adminAuth (modular session + pin)", () => {
     expect(() => requireAdmin(req({ cookie }))).toThrow(ApiError);
   });
 
+  it("session survives validation after create (signed cookie)", () => {
+    const token = createAdminSession();
+    expect(token.split(".").length).toBe(3);
+    const cookie = `${ADMIN_SESSION_COOKIE}=${token}`;
+    expect(isAdminAuthenticated(req({ cookie }))).toBe(true);
+  });
+
   it("admin session cookie helper sets HttpOnly", () => {
     const v = adminSessionCookieValue("abc");
     expect(v).toContain("HttpOnly");

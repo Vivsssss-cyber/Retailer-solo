@@ -39,7 +39,11 @@ export function requireAdminPin(request: Request): void {
     return;
   }
 
-  throw new ApiError("FORBIDDEN", "Invalid or missing admin credentials", 401);
+  throw new ApiError(
+    "UNAUTHORIZED",
+    "Invalid or missing admin credentials — sign in again with the admin PIN.",
+    401,
+  );
 }
 
 /** Alias used by admin write routes. */

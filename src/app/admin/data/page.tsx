@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { FO, GameButton, cardStyle } from "@/components/cyan";
 import { AdminShell, AdminSection, StatTile } from "@/components/admin/AdminShell";
 import { AdminCreateHeat } from "@/components/admin/AdminCreateHeat";
-import { lockAdmin } from "@/lib/adminConfigStore";
+import { reauthIfAdminExpired } from "@/components/admin/AdminGate";
 import { api, USE_MOCK } from "@/services/api";
+import { parseApiFailure } from "@/services/apiErrors";
 
 interface HeatRow {
   heat_id: string;
@@ -42,6 +43,8 @@ export default function AdminDataPage() {
       setStats(data.stats);
     } catch (e) {
       console.error("Failed to load admin data", e);
+      if (await reauthIfAdminExpired(e)) return;
+      alert(parseApiFailure(e).message);
     } finally {
       setLoading(false);
     }
@@ -58,6 +61,7 @@ export default function AdminDataPage() {
         setStats(data.stats);
       } catch (e) {
         console.error("Failed to load admin data", e);
+        if (active) await reauthIfAdminExpired(e);
       } finally {
         if (active) setLoading(false);
       }
@@ -72,8 +76,9 @@ export default function AdminDataPage() {
     try {
       await api.toggleHeatStatus(heatId);
       await refresh();
-    } catch {
-      alert("Failed to toggle heat status");
+    } catch (e) {
+      if (await reauthIfAdminExpired(e)) return;
+      alert(parseApiFailure(e).message || "Failed to toggle heat status");
     }
   };
 
@@ -82,8 +87,9 @@ export default function AdminDataPage() {
     try {
       await api.deleteHeat(heatId);
       await refresh();
-    } catch {
-      alert("Failed to delete heat");
+    } catch (e) {
+      if (await reauthIfAdminExpired(e)) return;
+      alert(parseApiFailure(e).message || "Failed to delete heat");
     }
   };
 
@@ -119,23 +125,9 @@ export default function AdminDataPage() {
       title="Sessions & data"
       subtitle="Create classroom groups, share join links, and inspect sessions."
       actions={
-        <>
-          <GameButton type="button" size="sm" variant="secondary" onClick={() => void refresh()}>
-            Refresh
-          </GameButton>
-          <GameButton
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              lockAdmin();
-              if (!USE_MOCK) void api.adminLogout();
-              window.location.href = "/admin";
-            }}
-          >
-            Lock admin
-          </GameButton>
-        </>
+        <GameButton type="button" size="sm" variant="secondary" onClick={() => void refresh()}>
+          Refresh
+        </GameButton>
       }
     >
       <div className="mb-4">
