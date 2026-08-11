@@ -18,19 +18,27 @@ import type { GameConfig } from "@/engine";
 
 export default function AdminOverviewPage() {
   const [config, setConfig] = useState<GameConfig | null>(null);
-  const [stats] = useState(() => readMockStoreStats());
+  const [stats, setStats] = useState(() => readMockStoreStats());
 
   useEffect(() => {
     let cancelled = false;
     const t = window.setTimeout(() => {
       void (async () => {
         if (USE_MOCK) {
-          if (!cancelled) setConfig(loadAdminConfig());
+          if (!cancelled) {
+            setConfig(loadAdminConfig());
+            setStats(readMockStoreStats());
+          }
           return;
         }
         try {
-          const remote = await api.getConfiguration("default");
-          if (!cancelled) setConfig(remote);
+          const [remote, data] = await Promise.all([
+            api.getConfiguration("default"),
+            api.getAdminData().catch(() => null),
+          ]);
+          if (cancelled) return;
+          setConfig(remote);
+          if (data?.stats) setStats(data.stats);
         } catch {
           if (!cancelled) setConfig(loadAdminConfig());
         }

@@ -160,7 +160,8 @@ export function PlayScreen({ attemptId }: { attemptId: string }) {
                   "lg:h-dvh lg:max-h-dvh lg:overflow-hidden",
                   "overflow-x-clip overflow-y-auto lg:overflow-y-hidden",
                   "pt-3 sm:pt-4",
-                  "pb-[calc(7.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-[92px]",
+                  // Mobile dock stacks (header + stepper) ~150–170px; keep content clear of fixed buttons.
+                  "pb-[calc(11.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(8rem+env(safe-area-inset-bottom))] lg:pb-[108px]",
                 ].join(" "),
           ].join(" ")}
           style={{ color: "var(--sv-text)" }}

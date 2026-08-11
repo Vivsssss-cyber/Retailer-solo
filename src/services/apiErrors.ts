@@ -52,6 +52,8 @@ function friendlyMessage(code: string | undefined, fallback: string): string {
         fallback ||
         "Admin session expired or missing. Log in again with the server ADMIN_PIN."
       );
+    case "RATE_LIMITED":
+      return "Too many attempts. Wait a moment and try again.";
     default:
       return fallback || "Something went wrong. Try again.";
   }

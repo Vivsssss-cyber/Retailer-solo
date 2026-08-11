@@ -62,10 +62,10 @@ export function DecisionPanel({
       role="region"
       aria-label="Place order"
       data-tour="order"
-      className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 w-[min(720px,calc(100vw-1rem))] sm:w-[min(740px,calc(100vw-1.5rem))] pointer-events-none"
+      className="fixed bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 w-[min(720px,calc(100vw-1rem))] sm:w-[min(740px,calc(100vw-1.5rem))] pointer-events-none"
     >
       <div
-        className="sv-frost-dock pointer-events-auto flex flex-col gap-2.5 rounded-[var(--sv-radius-2xl)] p-3 sm:flex-row sm:items-center sm:gap-3 sm:rounded-[var(--sv-radius-pill)] sm:py-2.5 sm:pr-2.5 sm:pl-3.5"
+        className="sv-frost-dock pointer-events-auto flex flex-col gap-2 rounded-[var(--sv-radius-2xl)] p-2.5 sm:flex-row sm:items-center sm:gap-3 sm:rounded-[var(--sv-radius-pill)] sm:p-0 sm:py-2.5 sm:pr-2.5 sm:pl-3.5"
         style={{
           border: "1.5px solid var(--sv-border)",
           backdropFilter: "blur(56px) saturate(1.55)",
