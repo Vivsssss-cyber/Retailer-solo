@@ -1,14 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
-import { FO, cardStyle } from "@/components/cyan";
+import { useMemo, useState } from "react";
+import { FO, TabBar, cardStyle } from "@/components/cyan";
 import GraphicalView from "@/components/game/GraphicalView";
 import type { RoundRecord } from "@/engine";
+
+type CostMode = "round" | "accum";
 
 /**
  * Two side-by-side graphs (Rochak demo parity):
  * 1) Inventory + Backlog + Demand (flow)
- * 2) Cumulative cost
+ * 2) Cost — round cost by default, toggle to cumulative
  */
 export function TrendPanel({
   rounds,
@@ -17,6 +19,8 @@ export function TrendPanel({
   rounds: RoundRecord[];
   dense?: boolean;
 }) {
+  const [costMode, setCostMode] = useState<CostMode>("round");
+
   // Real game rounds only — R1, R2, … (no fake R0 zeros that skew axes / legend)
   const chartData = useMemo(
     () =>
@@ -25,6 +29,7 @@ export function TrendPanel({
         Inventory: r.ending_inventory,
         Backlog: r.ending_backlog,
         Demand: r.customer_demand,
+        "Round Cost": r.round_cost,
         "Total Cost": r.cumulative_cost,
       })),
     [rounds],
@@ -44,18 +49,20 @@ export function TrendPanel({
     [chartData, dense],
   );
 
+  const costKey = costMode === "round" ? "Round Cost" : "Total Cost";
+
   const costGraphical = useMemo(
     () => ({
       type: "evolution" as const,
       title: "",
       xAxis: "Rounds",
-      yAxis: ["Total Cost"],
+      yAxis: [costKey],
       chartData,
       height: dense ? undefined : 200,
       embedded: dense,
       fill: dense,
     }),
-    [chartData, dense],
+    [chartData, dense, costKey],
   );
 
   const titleStyle = {
@@ -109,8 +116,22 @@ export function TrendPanel({
         }}
         className="sv-surface sv-chart-card flex flex-col min-h-0 min-w-0 w-full"
       >
-        <div className={`shrink-0 ${dense ? "mb-1.5" : "mb-2"}`}>
-          <span style={titleStyle}>Cost over time</span>
+        <div
+          className={`shrink-0 flex items-center justify-between gap-2 ${dense ? "mb-1.5" : "mb-2"}`}
+        >
+          <span style={titleStyle}>
+            {costMode === "round" ? "Round cost" : "Cumulative cost"}
+          </span>
+          <div className="shrink-0 scale-[0.92] origin-right sm:scale-100">
+            <TabBar
+              tabs={[
+                { id: "round", label: "Round" },
+                { id: "accum", label: "Total" },
+              ]}
+              activeTab={costMode}
+              onChange={(id) => setCostMode(id as CostMode)}
+            />
+          </div>
         </div>
         <div
           className={
@@ -119,7 +140,7 @@ export function TrendPanel({
               : "w-full min-w-0 shrink-0 overflow-visible"
           }
         >
-          <GraphicalView data={costGraphical} />
+          <GraphicalView key={costMode} data={costGraphical} />
         </div>
       </div>
     </div>
