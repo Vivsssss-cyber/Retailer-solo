@@ -38,9 +38,9 @@ import { hasCompletedPlayTour } from "@/lib/playTour";
 const COACH_LINES: Record<string, string> = {
   welcome: "I'm your coach. Before we open the warehouse — let's get you set up.",
   mode: "Join a group with the code from your instructor. Solo practice only if they enabled it.",
-  practiceFast: "Pick a persona — face only, cosmetic. Then we open the warehouse.",
-  identity: "Pick a persona — face only. Cosmetic only — never changes scoring.",
-  heatCode: "Enter the group code. Next screen you pick a persona.",
+  practiceFast: "Pick a persona and a name — cosmetic only. Then we open the warehouse.",
+  identity: "Pick a persona and a name — cosmetic only. Never changes scoring.",
+  heatCode: "Enter the group code. Next screen you pick a persona and name.",
   official:
     "Official is one attempt per email — permanent for this group. Practice is unlimited.",
   officialConfirm:
@@ -317,21 +317,25 @@ function ModeScreen({
   );
 }
 
-/** Solo practice fast path: persona face only → start. */
+/** Solo practice fast path: persona face + display name → start. */
 function PracticeFastScreen({
   persona,
+  name,
   onPersonaChange,
+  onNameChange,
   onStart,
   onBack,
   onHoverPersona,
 }: {
   persona: PersonaSlug | "";
+  name: string;
   onPersonaChange: (slug: PersonaSlug) => void;
+  onNameChange: (v: string) => void;
   onStart: () => void;
   onBack: () => void;
   onHoverPersona?: (slug: PersonaSlug | null) => void;
 }) {
-  const canStart = !!persona;
+  const canStart = !!persona && name.trim().length > 0;
 
   return (
     <GlassCard className="p-4">
@@ -357,7 +361,7 @@ function PracticeFastScreen({
           lineHeight: 1.45,
         }}
       >
-        Pick a persona — then start. Face only, no roles or names.
+        Pick a persona and a display name — then start.
       </p>
       <p
         style={{
@@ -391,6 +395,44 @@ function PracticeFastScreen({
         value={persona}
         onChange={onPersonaChange}
         onHover={onHoverPersona}
+      />
+
+      <label
+        htmlFor="practice-name"
+        style={{
+          display: "block",
+          fontFamily: FO,
+          fontSize: 10,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          color: "var(--sv-teal-mid)",
+          marginBottom: 8,
+        }}
+      >
+        Display name
+      </label>
+      <input
+        id="practice-name"
+        value={name}
+        onChange={(e) => onNameChange(e.target.value)}
+        placeholder="e.g. Ava"
+        maxLength={24}
+        style={{
+          width: "100%",
+          fontFamily: FO,
+          fontSize: 18,
+          padding: "14px 16px",
+          borderRadius: 12,
+          border: "2px solid var(--sv-border)",
+          background: "rgba(255,255,255,0.8)",
+          color: "var(--sv-ink)",
+          marginBottom: 20,
+          outline: "none",
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && canStart) onStart();
+        }}
       />
 
       <div className="flex gap-2">
@@ -657,9 +699,9 @@ export default function OnboardingFlow() {
   const next = () => setStepIndex((s) => s + 1);
   const back = () => setStepIndex((s) => Math.max(0, s - 1));
 
-  /** Ensure practice has a persona; display name defaults to Player (no name field). */
+  /** Ensure practice has persona + display name before start. */
   const ensurePracticeProfile = () => {
-    const player = data.name.trim() || readPlayerProfile().name?.trim() || "Player";
+    const player = data.name.trim() || "Player";
     const profile = readPlayerProfile();
     const persona = data.persona || profile.persona || DEFAULT_PERSONA;
     writePlayerProfile({ persona, name: player });
@@ -723,7 +765,9 @@ export default function OnboardingFlow() {
         component: (
           <PracticeFastScreen
             persona={data.persona}
+            name={data.name}
             onPersonaChange={(v) => updateData("persona", v)}
+            onNameChange={(v) => updateData("name", v)}
             onStart={() => {
               ensurePracticeProfile();
               goToPlayOrTutorial();

@@ -20,8 +20,8 @@ import { PersonaPicker } from "@/components/onboarding/PersonaPicker";
 import type { PersonaSlug } from "@/lib/personas";
 
 /**
- * Player join entry: /join/ABC123 → pick persona → practice attempt → /play/[id].
- * Persona is cosmetic only (face pick). Display name defaults to "Player".
+ * Player join entry: /join/ABC123 → pick persona + display name → practice attempt → /play/[id].
+ * Persona is face-only (no role labels). Name optional (defaults to "Player").
  * Phase 1: practice joins only.
  */
 export default function JoinRoomPage() {
@@ -36,6 +36,7 @@ export default function JoinRoomPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [persona, setPersona] = useState<PersonaSlug | "">("");
+  const [name, setName] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
 
   const loadHeat = useCallback(async () => {
@@ -70,6 +71,7 @@ export default function JoinRoomPage() {
       reset();
       const profile = readPlayerProfile();
       if (profile.persona) setPersona(profile.persona);
+      if (profile.name) setName(profile.name);
       void loadHeat();
     }, 0);
     return () => window.clearTimeout(t);
@@ -93,7 +95,7 @@ export default function JoinRoomPage() {
       return;
     }
     setLocalError(null);
-    const player = readPlayerProfile().name?.trim() || "Player";
+    const player = name.trim() || "Player";
     writePlayerProfile({ name: player, persona });
     try {
       const attemptId = await joinHeat(code, player, { is_official: false });
@@ -205,7 +207,8 @@ export default function JoinRoomPage() {
                     lineHeight: 1.4,
                   }}
                 >
-                  Pick a persona — face only, cosmetic. Never affects score.
+                  Pick a persona and display name — cosmetic only. Never affects
+                  score.
                 </p>
                 <span
                   style={{
@@ -222,13 +225,54 @@ export default function JoinRoomPage() {
                   Persona
                 </span>
                 <PersonaPicker value={persona} onChange={handlePersonaChange} />
+                <label
+                  htmlFor="join-name"
+                  style={{
+                    display: "block",
+                    fontFamily: FO,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    color: "var(--sv-teal-mid)",
+                    marginBottom: 8,
+                  }}
+                >
+                  Display name
+                </label>
+                <input
+                  id="join-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Optional — e.g. Alex"
+                  maxLength={24}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && persona) void handleJoin();
+                  }}
+                  style={{
+                    width: "100%",
+                    fontFamily: FO,
+                    fontSize: 16,
+                    padding: "14px 16px",
+                    borderRadius: 12,
+                    border: "2px solid var(--sv-border)",
+                    background: "rgba(255,255,255,0.8)",
+                    color: "var(--sv-ink)",
+                    marginBottom: 20,
+                    outline: "none",
+                  }}
+                />
                 <GameButton
                   size="lg"
                   style={{ width: "100%" }}
                   disabled={submitting || !persona}
                   onClick={() => void handleJoin()}
                 >
-                  {submitting ? "Joining…" : "Enter the warehouse"}
+                  {submitting
+                    ? "Joining…"
+                    : name.trim()
+                      ? "Enter the warehouse"
+                      : "Join as Player"}
                 </GameButton>
               </>
             )}
