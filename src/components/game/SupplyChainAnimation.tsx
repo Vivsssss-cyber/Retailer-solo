@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useSyncExternalStore } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { FO, GameButton, cardStyle } from "@/components/cyan";
@@ -361,10 +361,12 @@ function KpiCard({
   valueColor?: string;
   animated?: boolean;
 }) {
-  const kpiCardChrome = { ...cardStyle, padding: 0 as const };
+  // cardStyle ships padding: 16 — drop it (not `0`, which would out-rank the
+  // responsive px/py classes below and leave the value + hint on the card edge).
+  const kpiCardChrome: CSSProperties = { ...cardStyle, padding: undefined };
   const inner = (
     <div
-      className="h-full px-2 py-2 sm:px-3 sm:py-3"
+      className="h-full px-2.5 py-2.5 sm:px-3 sm:py-3"
       style={kpiCardChrome}
     >
       <div className="flex items-center gap-1 sm:gap-1.5 mb-1 sm:mb-1.5">

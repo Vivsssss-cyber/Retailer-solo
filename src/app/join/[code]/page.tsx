@@ -16,10 +16,13 @@ import { parseApiFailure } from "@/services/apiErrors";
 import type { HeatSummary } from "@/services/types";
 import { readPlayerProfile, writePlayerProfile } from "@/lib/playerProfile";
 import { normalizeHeatKey } from "@/lib/heatKey";
+import { PersonaPicker } from "@/components/onboarding/PersonaPicker";
+import type { PersonaSlug } from "@/lib/personas";
 
 /**
- * Player join entry: /join/ABC123 → optional name → practice attempt → /play/[id].
- * Name can be skipped (defaults to "Player"). Phase 1: practice joins only.
+ * Player join entry: /join/ABC123 → pick persona → practice attempt → /play/[id].
+ * Persona is cosmetic only (face pick). Display name defaults to "Player".
+ * Phase 1: practice joins only.
  */
 export default function JoinRoomPage() {
   const params = useParams();
@@ -32,7 +35,7 @@ export default function JoinRoomPage() {
   const [heat, setHeat] = useState<HeatSummary | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [name, setName] = useState("");
+  const [persona, setPersona] = useState<PersonaSlug | "">("");
   const [localError, setLocalError] = useState<string | null>(null);
 
   const loadHeat = useCallback(async () => {
@@ -66,7 +69,7 @@ export default function JoinRoomPage() {
     const t = window.setTimeout(() => {
       reset();
       const profile = readPlayerProfile();
-      if (profile.name) setName(profile.name);
+      if (profile.persona) setPersona(profile.persona);
       void loadHeat();
     }, 0);
     return () => window.clearTimeout(t);
@@ -79,10 +82,19 @@ export default function JoinRoomPage() {
     heat.attempt_count < heat.max_players &&
     !loadError;
 
+  const handlePersonaChange = (slug: PersonaSlug) => {
+    setPersona(slug);
+    writePlayerProfile({ persona: slug });
+  };
+
   const handleJoin = async () => {
+    if (!persona) {
+      setLocalError("Pick a persona to continue.");
+      return;
+    }
     setLocalError(null);
-    const player = name.trim() || "Player";
-    writePlayerProfile({ name: player, persona: readPlayerProfile().persona });
+    const player = readPlayerProfile().name?.trim() || "Player";
+    writePlayerProfile({ name: player, persona });
     try {
       const attemptId = await joinHeat(code, player, { is_official: false });
       router.push(`/play/${attemptId}`);
@@ -193,55 +205,30 @@ export default function JoinRoomPage() {
                     lineHeight: 1.4,
                   }}
                 >
-                  You&apos;re in the group. Add a display name now or skip and join as
-                  Player.
+                  Pick a persona — face only, cosmetic. Never affects score.
                 </p>
-                <label
-                  htmlFor="join-name"
+                <span
                   style={{
-                    fontFamily: FO,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: "var(--sv-text-muted)",
                     display: "block",
-                    marginBottom: 6,
+                    fontFamily: FO,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    color: "var(--sv-teal-mid)",
+                    marginBottom: 10,
                   }}
                 >
-                  Display name (optional)
-                </label>
-                <input
-                  id="join-name"
-                  autoFocus
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Skip for now — e.g. Alex"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void handleJoin();
-                  }}
-                  style={{
-                    width: "100%",
-                    fontFamily: FO,
-                    fontSize: 16,
-                    padding: "14px 16px",
-                    borderRadius: 12,
-                    border: "2px solid var(--sv-border)",
-                    background: "rgba(255,255,255,0.8)",
-                    color: "var(--sv-ink)",
-                    marginBottom: 20,
-                    outline: "none",
-                  }}
-                />
+                  Persona
+                </span>
+                <PersonaPicker value={persona} onChange={handlePersonaChange} />
                 <GameButton
                   size="lg"
                   style={{ width: "100%" }}
-                  disabled={submitting}
+                  disabled={submitting || !persona}
                   onClick={() => void handleJoin()}
                 >
-                  {submitting
-                    ? "Joining…"
-                    : name.trim()
-                      ? "Enter the warehouse"
-                      : "Join without name"}
+                  {submitting ? "Joining…" : "Enter the warehouse"}
                 </GameButton>
               </>
             )}

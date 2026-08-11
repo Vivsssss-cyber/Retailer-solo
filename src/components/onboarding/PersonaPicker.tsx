@@ -1,6 +1,5 @@
 "use client";
 
-import { FO } from "@/components/cyan";
 import {
   PERSONA_AVATAR_PLACEHOLDER,
   PERSONAS,
@@ -8,9 +7,9 @@ import {
 } from "@/lib/personas";
 
 /**
- * Avatar radiogroup for onboarding.
- * Uses plain <img> (not next/image) so clicks always hit the button and
- * failed assets fall back without breaking selection state.
+ * Face-only persona radiogroup for onboarding.
+ * No role titles or display names — cosmetic avatar pick only.
+ * Uses plain <img> so clicks always hit the button and failed assets fall back.
  */
 export function PersonaPicker({
   value,
@@ -24,11 +23,11 @@ export function PersonaPicker({
   return (
     <div
       role="radiogroup"
-      aria-label="Choose a persona avatar"
-      className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6"
+      aria-label="Choose a persona"
+      className="grid grid-cols-3 sm:grid-cols-5 gap-2.5 sm:gap-3 mb-6"
       onMouseLeave={() => onHover?.(null)}
     >
-      {PERSONAS.map((p) => {
+      {PERSONAS.map((p, index) => {
         const active = value === p.slug;
         return (
           <button
@@ -36,7 +35,7 @@ export function PersonaPicker({
             type="button"
             role="radio"
             aria-checked={active}
-            aria-label={p.name}
+            aria-label={`Persona ${index + 1}`}
             data-persona={p.slug}
             onClick={(e) => {
               e.preventDefault();
@@ -49,12 +48,10 @@ export function PersonaPicker({
             className="touch-manipulation select-none"
             style={{
               display: "flex",
-              flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              gap: 8,
-              padding: "12px 10px 10px",
-              minHeight: 132,
+              padding: 10,
+              minHeight: 96,
               borderRadius: 14,
               border: active
                 ? "2.5px solid var(--sv-teal-mid)"
@@ -77,12 +74,12 @@ export function PersonaPicker({
             <img
               src={p.avatarSrc}
               alt=""
-              width={88}
-              height={88}
+              width={72}
+              height={72}
               draggable={false}
               style={{
-                width: 88,
-                height: 88,
+                width: 72,
+                height: 72,
                 objectFit: "contain",
                 imageRendering: "pixelated",
                 pointerEvents: "none",
@@ -94,19 +91,6 @@ export function PersonaPicker({
                 el.src = PERSONA_AVATAR_PLACEHOLDER;
               }}
             />
-            <span
-              style={{
-                fontFamily: FO,
-                fontSize: 11,
-                fontWeight: active ? 700 : 600,
-                color: active ? "var(--sv-teal-mid)" : "var(--sv-ink)",
-                textAlign: "center",
-                lineHeight: 1.2,
-                pointerEvents: "none",
-              }}
-            >
-              {p.name.replace(/^The\s+/i, "")}
-            </span>
           </button>
         );
       })}

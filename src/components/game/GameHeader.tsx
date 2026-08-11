@@ -102,7 +102,7 @@ export function GameHeader({
               onClick={onHowToPlayClick}
               size="sm"
               variant="secondary"
-              className="hidden md:inline-flex items-center gap-1.5 px-3 bg-white/60 min-h-9"
+              className="!hidden md:!inline-flex items-center gap-1.5 px-3 bg-white/60 min-h-9"
               aria-label="How to play"
             >
               <Info size={14} />
@@ -112,7 +112,7 @@ export function GameHeader({
               onClick={onHowToPlayClick}
               size="sm"
               variant="secondary"
-              className="md:hidden inline-flex items-center justify-center w-10 h-10 p-0 bg-white/60"
+              className="md:!hidden inline-flex items-center justify-center w-10 h-10 p-0 bg-white/60"
               aria-label="How to play"
             >
               <Info size={14} />

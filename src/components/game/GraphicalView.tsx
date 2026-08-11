@@ -29,7 +29,12 @@ interface GraphicalViewProps {
 }
 
 const FALLBACK_PLOT_H = 180;
-const MIN_FILL_H = 120;
+/**
+ * Floor for the plot area when filling a parent. Kept low on purpose: the card
+ * paints with `overflow: visible` (dots/ticks must not shear), so a floor taller
+ * than the space the parent hands us leaks the x-axis outside the card.
+ */
+const MIN_FILL_H = 96;
 
 /** Default-on series for multi-metric flow charts. */
 const DEFAULT_ON = new Set(["inventory", "stock", "backlog", "demand"]);
